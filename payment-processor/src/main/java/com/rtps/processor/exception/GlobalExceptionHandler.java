@@ -1,0 +1,48 @@
+package com.rtps.processor.exception;
+
+import com.rtps.processor.dto.ErrorResponse;
+import io.github.resilience4j.ratelimiter.RequestNotPermitted;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+
+import java.time.LocalDateTime;
+
+@ControllerAdvice
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponse> handleValidationExceptions(MethodArgumentNotValidException ex) {
+        String fieldName = ex.getBindingResult().getFieldError().getField();
+        String errorMessage = ex.getBindingResult().getFieldError().getDefaultMessage();
+        
+        ErrorResponse error = ErrorResponse.builder()
+                .error("VALIDATION_ERROR")
+                .message("Field '" + fieldName + "' " + errorMessage)
+                .timestamp(LocalDateTime.now())
+                .build();
+        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(RequestNotPermitted.class)
+    public ResponseEntity<ErrorResponse> handleRateLimit(RequestNotPermitted ex) {
+        ErrorResponse error = ErrorResponse.builder()
+                .error("TOO_MANY_REQUESTS")
+                .message("Rate limit exceeded. Please try again later.")
+                .timestamp(LocalDateTime.now())
+                .build();
+        return new ResponseEntity<>(error, HttpStatus.TOO_MANY_REQUESTS);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponse> handleGlobalException(Exception ex) {
+        ErrorResponse error = ErrorResponse.builder()
+                .error("INTERNAL_ERROR")
+                .message("An unexpected error occurred: " + ex.getMessage())
+                .timestamp(LocalDateTime.now())
+                .build();
+        return new ResponseEntity<>(error, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+}

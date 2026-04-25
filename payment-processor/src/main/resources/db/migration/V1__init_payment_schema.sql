@@ -29,7 +29,6 @@ CREATE TABLE payments (
 -- Indexes for Payments
 CREATE INDEX idx_pay_user_id ON payments(user_id);
 CREATE INDEX idx_pay_status ON payments(status);
-CREATE INDEX idx_pay_order_id ON payments(order_id);
 CREATE INDEX idx_pay_created_at ON payments(created_at);
 
 -- Create Transaction Logs Table

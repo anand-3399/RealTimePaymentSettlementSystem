@@ -17,5 +17,18 @@ public class OrderResponse {
     private String status;
     private BigDecimal amount;
     private String currency;
+    private String senderAccount;
+    private String recipientAccount;
     private LocalDateTime createdAt;
+    private PaymentInfo payment;
+
+    @Data
+    @Builder
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class PaymentInfo {
+        private UUID paymentId;
+        private String gatewayTransactionId;
+        private LocalDateTime processedAt;
+    }
 }

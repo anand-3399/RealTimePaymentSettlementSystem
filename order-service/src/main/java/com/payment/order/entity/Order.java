@@ -46,6 +46,6 @@ public class Order {
     private LocalDateTime createdAt;
 
     public enum OrderStatus {
-        PENDING, SUCCESS, FAILED
+        PENDING, SUCCESS, FAILED, COMPLETED
     }
 }

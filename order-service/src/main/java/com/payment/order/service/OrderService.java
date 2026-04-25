@@ -82,10 +82,42 @@ public class OrderService {
         return mapToResponse(savedOrder);
     }
 
+    @Autowired
+    private com.payment.order.client.PaymentProcessorClient paymentProcessorClient;
+
+    @Transactional
     public OrderResponse getOrderById(UUID orderId) {
-        return orderRepository.findById(orderId)
-                .map(this::mapToResponse)
+        Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Order not found: " + orderId));
+
+        // If order is still PENDING locally, check the real-time status from Payment Processor
+        if (order.getStatus() == Order.OrderStatus.PENDING) {
+            java.util.Optional<com.payment.order.dto.PaymentStatusResponse> paymentOpt = paymentProcessorClient.getPaymentStatusByOrderId(orderId);
+            
+            if (paymentOpt.isPresent()) {
+                com.payment.order.dto.PaymentStatusResponse payment = paymentOpt.get();
+                logger.info("Real-time update: Payment found for order {}. Status: {}", orderId, payment.getStatus());
+                
+                // Update local status if processor says it's finished
+                if ("COMPLETED".equalsIgnoreCase(payment.getStatus())) {
+                    order.setStatus(Order.OrderStatus.COMPLETED);
+                    orderRepository.save(order);
+                } else if ("FAILED".equalsIgnoreCase(payment.getStatus())) {
+                    order.setStatus(Order.OrderStatus.FAILED);
+                    orderRepository.save(order);
+                }
+                
+                OrderResponse response = mapToResponse(order);
+                response.setPayment(OrderResponse.PaymentInfo.builder()
+                        .paymentId(payment.getPaymentId())
+                        .gatewayTransactionId(payment.getGatewayTransactionId())
+                        .processedAt(payment.getProcessedAt())
+                        .build());
+                return response;
+            }
+        }
+
+        return mapToResponse(order);
     }
 
     public List<OrderResponse> getOrdersByUserId(String userId) {
@@ -104,6 +136,8 @@ public class OrderService {
                 .status(order.getStatus().name())
                 .amount(order.getAmount())
                 .currency(order.getCurrency())
+                .senderAccount(order.getSenderBankAccount())
+                .recipientAccount(order.getRecipientBankAccount())
                 .createdAt(order.getCreatedAt())
                 .build();
     }
