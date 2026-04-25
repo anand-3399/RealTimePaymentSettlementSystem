@@ -1,0 +1,19 @@
+<div class="payment-container">
+    <h3>Initiate Payment</h3>
+    <oj-form-layout max-columns="3">
+        <oj-input-number label-hint="Amount" value="{{amount}}"></oj-input-number>
+        <oj-input-text label-hint="Currency" value="{{currency}}"></oj-input-text>
+        <oj-button on-oj-action="[[onClickSubmit]]" chroming="callToAction">Submit</oj-button>
+    </oj-form-layout>
+
+    <div class="oj-sm-margin-4t">
+        <h3>Payment History</h3>
+        <oj-table data="[[payments]]"
+                  columns='[
+                    {"headerText": "Order ID", "field": "orderId"},
+                    {"headerText": "Amount", "field": "amount"},
+                    {"headerText": "Status", "field": "status"}
+                  ]'>
+        </oj-table>
+    </div>
+</div>

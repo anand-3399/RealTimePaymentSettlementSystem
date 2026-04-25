@@ -1,0 +1,45 @@
+<div class="oj-hybrid-padding">
+    <h1>RTPS Payment Dashboard</h1>
+
+    <!-- Login Section -->
+    <div data-bind="ifnot: isAuthenticated">
+        <oj-form-layout>
+            <oj-input-text label-hint="Username" value="{{username}}"></oj-input-text>
+            <oj-input-text label-hint="Password" value="{{password}}" type="password"></oj-input-text>
+            <oj-button on-oj-action="[[handleLogin]]">Login</oj-button>
+        </oj-form-layout>
+    </div>
+
+    <!-- Dashboard Content -->
+    <div data-bind="if: isAuthenticated">
+        <div class="oj-flex oj-sm-flex-direction-column">
+            
+            <div class="oj-flex-item">
+                <h3>Initiate New Payment</h3>
+                <oj-form-layout max-columns="3">
+                    <oj-input-number label-hint="Amount" value="{{amount}}"></oj-input-number>
+                    <oj-input-text label-hint="Currency" value="{{currency}}"></oj-input-text>
+                    <oj-button on-oj-action="[[handleCreatePayment]]" chroming="callToAction">Submit Payment</oj-button>
+                </oj-form-layout>
+            </div>
+
+            <div class="oj-flex-item oj-sm-margin-4t">
+                <h3>Recent Payments</h3>
+                <oj-table aria-label="Payments Table"
+                          data="[[dataprovider]]"
+                          columns='[
+                            {"headerText": "Order ID", "field": "orderId"},
+                            {"headerText": "Amount", "field": "amount"},
+                            {"headerText": "Currency", "field": "currency"},
+                            {"headerText": "Status", "field": "status", "template": "statusTemplate"},
+                            {"headerText": "Created At", "field": "createdAt"}
+                          ]'>
+                    <template slot="statusTemplate" data-oj-as="cell">
+                        <span data-bind="text: cell.data, style: { color: cell.data === 'SETTLED' ? 'green' : (cell.data === 'PENDING' ? 'orange' : 'blue') }"></span>
+                    </template>
+                </oj-table>
+            </div>
+
+        </div>
+    </div>
+</div>

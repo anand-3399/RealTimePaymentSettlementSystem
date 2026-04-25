@@ -1,0 +1,120 @@
+# ============================================================
+# RTPS - Real-Time Payment Settlement System
+# .gitignore - Root level for Monorepo
+# ============================================================
+
+# ───────────────────────────────────────────
+# Maven Build Artifacts
+# ───────────────────────────────────────────
+target/
+*.jar
+*.war
+*.ear
+*.class
+!**/test/**/*.class
+
+# ───────────────────────────────────────────
+# IDE Files
+# ───────────────────────────────────────────
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Eclipse
+.classpath
+.project
+.settings/
+.factorypath
+bin/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# NetBeans
+nbproject/
+nbbuild/
+nbdist/
+
+# ───────────────────────────────────────────
+# OS Generated Files
+# ───────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ───────────────────────────────────────────
+# Logs
+# ───────────────────────────────────────────
+*.log
+logs/
+log/
+spring.log
+
+# ───────────────────────────────────────────
+# Environment & Secrets — NEVER PUSH THESE
+# ───────────────────────────────────────────
+.env
+.env.*
+*.env
+secrets.yml
+secrets.yaml
+secrets.properties
+
+# Local override configs (credentials go here)
+application-local.yml
+application-local.yaml
+application-local.properties
+
+# ───────────────────────────────────────────
+# Database
+# ───────────────────────────────────────────
+*.sql.bak
+*.dump
+*.backup
+oracle-wallet/
+wallet/
+
+# ───────────────────────────────────────────
+# Node / OJET UI Portal
+# ───────────────────────────────────────────
+ui-portal/node_modules/
+ui-portal/.cache/
+ui-portal/dist/
+ui-portal/web/js/libs/
+ui-portal/web/js/jet-composites/
+ui-portal/.idea/
+ui-portal/npm-debug.log*
+ui-portal/yarn-error.log
+
+# ───────────────────────────────────────────
+# Spring Boot Dev Tools
+# ───────────────────────────────────────────
+.spring-boot-devtools.properties
+
+# ───────────────────────────────────────────
+# Docker
+# ───────────────────────────────────────────
+docker-compose.override.yml
+
+# ───────────────────────────────────────────
+# Flyway — local migration backups
+# ───────────────────────────────────────────
+*.sql.orig
+
+# ───────────────────────────────────────────
+# Temporary Files
+# ───────────────────────────────────────────
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+*.swo

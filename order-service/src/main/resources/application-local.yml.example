@@ -1,0 +1,14 @@
+# ============================================================
+# LOCAL CREDENTIALS TEMPLATE
+# Copy this file to application-local.yml and fill in values
+# application-local.yml is in .gitignore (never pushed)
+# ============================================================
+
+spring:
+  datasource:
+    url: jdbc:oracle:thin:@localhost:1521/XEPDB1
+    username: YOUR_DB_USERNAME
+    password: YOUR_DB_PASSWORD
+
+rtps:
+  jwtSecret: YOUR_SECRET_KEY_MUST_BE_32_CHARS_MINIMUM

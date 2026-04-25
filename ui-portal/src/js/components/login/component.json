@@ -1,0 +1,10 @@
+{
+    "name": "login-form",
+    "version": "1.0.0",
+    "jetVersion": ">=15.0.0",
+    "properties": {
+        "onLoginSuccess": {
+            "type": "function"
+        }
+    }
+}

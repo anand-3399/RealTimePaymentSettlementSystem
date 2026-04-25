@@ -1,0 +1,8 @@
+<div class="login-container">
+    <oj-form-layout>
+        <oj-input-text label-hint="Username" value="{{username}}"></oj-input-text>
+        <oj-input-text label-hint="Password" value="{{password}}" type="password"></oj-input-text>
+        <oj-button id="loginButton" on-oj-action="[[onClickLogin]]" chroming="callToAction">Login</oj-button>
+        <div data-bind="text: message" class="message"></div>
+    </oj-form-layout>
+</div>
