@@ -6,6 +6,9 @@ import com.payment.order.security.JwtUtils;
 import com.payment.order.service.RefreshTokenService;
 import com.payment.order.service.UserService;
 import jakarta.validation.Valid;
+
+import java.util.Optional;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -39,20 +42,25 @@ public class AuthController {
     public ResponseEntity<?> refreshToken(@Valid @RequestBody TokenRefreshRequest request) {
         String requestRefreshToken = request.getRefreshToken();
 
-        return refreshTokenService.findByToken(requestRefreshToken)
-                .map(refreshTokenService::verifyExpiration)
-                .map(RefreshToken::getUser)
-                .map(user -> {
-                    // 1. Generate NEW Access Token
-                    String token = jwtUtils.generateTokenFromUsername(user.getUsername());
-                    
-                    // 2. Generate NEW Refresh Token (Rotation)
-                    // The createRefreshToken method internally deletes the old one
-                    RefreshToken newRefreshToken = refreshTokenService.createRefreshToken(user.getUsername());
-                    
-                    return ResponseEntity.ok(new TokenRefreshResponse(token, newRefreshToken.getToken()));
-                })
-                .orElseThrow(() -> new RuntimeException("Refresh token is not in database!"));
+        Optional<RefreshToken> tokenOpt = refreshTokenService.findByToken(requestRefreshToken);
+
+        if (tokenOpt.isEmpty()) {
+            throw new RuntimeException("Refresh token is not in database!");
+        }
+
+        RefreshToken refreshToken = tokenOpt.get();
+        refreshTokenService.verifyExpiration(refreshToken);
+
+        com.payment.order.entity.User user = refreshToken.getUser();
+
+        // 1. Generate NEW Access Token
+        String token = jwtUtils.generateTokenFromUsername(user.getUsername());
+
+        // 2. Generate NEW Refresh Token (Rotation)
+        // The createRefreshToken method internally deletes the old one
+        RefreshToken newRefreshToken = refreshTokenService.createRefreshToken(user.getUsername());
+
+        return ResponseEntity.ok(new TokenRefreshResponse(token, newRefreshToken.getToken()));
     }
 
     @PostMapping("/password-reset-request")

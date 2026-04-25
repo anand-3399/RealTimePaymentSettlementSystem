@@ -4,6 +4,17 @@ spring:
   profiles:
     active: local
 
+logging:
+  file:
+    name: logs/order-service.log
+  logback:
+    rollingpolicy:
+      file-name-pattern: "logs/archived/order-service.%d{yyyy-MM-dd-HH}.log"
+      max-history: 2
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%X{correlationId}] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%X{correlationId}] %-5level %logger{36} - %msg%n"
+
   datasource:
     url: ${ORACLE_URL}
     username: ${ORACLE_USER}
