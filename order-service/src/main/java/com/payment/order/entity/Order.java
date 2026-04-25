@@ -27,6 +27,10 @@ public class Order {
     private String recipientBankAccount;
 
     @Column(nullable = false)
+    @jakarta.persistence.Convert(converter = com.payment.order.security.BankAccountEncryptor.class)
+    private String senderBankAccount;
+
+    @Column(nullable = false)
     private BigDecimal amount;
 
     @Column(nullable = false)

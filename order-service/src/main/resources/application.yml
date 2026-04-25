@@ -45,9 +45,14 @@ rtps:
   jwtSecret: ${JWT_SECRET}
   jwtExpirationMs: 1800000 # 30 minutes
   refreshExpirationMs: 604800000 # 7 days
+  encryption:
+    key: ${ENCRYPTION_KEY}
 
 server:
   port: 8081
+  tomcat:
+    connection-timeout: 30000  # 30 seconds
+    keep-alive-timeout: 60000  # 60 seconds
 
 springdoc:
   api-docs:
@@ -66,8 +71,11 @@ management:
 
 resilience4j:
   ratelimiter:
+    configs:
+      default:
+        limitRefreshPeriod: 1m
+        limitForPeriod: 3
+        timeoutDuration: 0s
     instances:
       orderService:
-        limitRefreshPeriod: 1m
-        limitForPeriod: 100
-        timeoutDuration: 5s
+        baseConfig: default

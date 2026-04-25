@@ -15,15 +15,23 @@ public class ValidationService {
     @Autowired
     private UserRepository userRepository;
 
-    public void validateOrderRequest(CreateOrderRequest request) {
+    public com.payment.order.entity.User validateOrderRequest(CreateOrderRequest request, String idempotencyKey) {
+        validateIdempotencyKey(idempotencyKey);
+        
         if (request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
             throw new InvalidOrderException("Amount must be greater than 0");
         }
 
-        if (!userRepository.findByUsername(request.getUserId()).isPresent()) {
-            throw new UserNotFoundException("User '" + request.getUserId() + "' does not exist");
-        }
+        return userRepository.findByUsername(request.getUserId())
+                .orElseThrow(() -> new UserNotFoundException("User '" + request.getUserId() + "' does not exist"));
+    }
 
-        // Add more validations like bank account format if needed
+    private void validateIdempotencyKey(String key) {
+        if (key == null || key.trim().isEmpty()) {
+            throw new InvalidOrderException("Idempotency-Key header is required");
+        }
+        if (key.length() > 255) {
+            throw new InvalidOrderException("Idempotency-Key is too long (max 255 characters)");
+        }
     }
 }

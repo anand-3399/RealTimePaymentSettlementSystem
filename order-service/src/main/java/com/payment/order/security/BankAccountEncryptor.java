@@ -15,13 +15,12 @@ public class BankAccountEncryptor implements AttributeConverter<String, String> 
 
     private static final String AES = "AES";
     
-    // In production, this MUST be loaded from a secure vault
-    private static final String SECRET = "RTPS_Project_Super_Secret_Key_32"; 
-
     private final SecretKeySpec key;
+    private final String aesSecret;
 
-    public BankAccountEncryptor() {
-        this.key = new SecretKeySpec(SECRET.getBytes(), AES);
+    public BankAccountEncryptor(@Value("${rtps.encryption.key}") String aesSecret) {
+        this.aesSecret = aesSecret;
+        this.key = new SecretKeySpec(aesSecret.getBytes(), AES);
     }
 
     @Override

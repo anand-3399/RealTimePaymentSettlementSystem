@@ -16,5 +16,7 @@ public class OrderCreatedEvent {
     private String userId;
     private BigDecimal amount;
     private String recipientAccount;
+    private String senderAccount;
     private LocalDateTime timestamp;
+    private String correlationId;
 }

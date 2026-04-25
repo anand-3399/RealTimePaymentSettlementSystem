@@ -18,8 +18,13 @@ public class KafkaProducer {
 
     public void sendOrderCreatedEventSync(OrderCreatedEvent event) throws Exception {
         logger.info("Publishing OrderCreatedEvent (Synchronous): {}", event.getOrderId());
-        // Blocking .get() ensures that an exception is thrown if Kafka is down
-        // allowing the DB transaction to roll back.
         kafkaTemplate.send(TOPIC, event.getOrderId(), event).get(5, TimeUnit.SECONDS);
+    }
+
+    public void sendOrderCreatedEventAsync(OrderCreatedEvent event) {
+        logger.info("Publishing OrderCreatedEvent (Asynchronous): {} | correlationId: {}", 
+                event.getOrderId(), event.getCorrelationId());
+        // Non-blocking send
+        kafkaTemplate.send(TOPIC, event.getOrderId(), event);
     }
 }

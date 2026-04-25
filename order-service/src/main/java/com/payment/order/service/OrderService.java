@@ -3,13 +3,13 @@ package com.payment.order.service;
 import com.payment.order.dto.CreateOrderRequest;
 import com.payment.order.dto.OrderResponse;
 import com.payment.order.entity.Order;
-import com.payment.order.event.KafkaProducer;
-import com.payment.order.event.OrderCreatedEvent;
+import com.payment.order.event.OrderCreatedInternalEvent;
 import com.payment.order.repository.OrderRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,9 +32,9 @@ public class OrderService {
 
     @Autowired
     private IdempotencyService idempotencyService;
-
+    
     @Autowired
-    private KafkaProducer kafkaProducer;
+    private ApplicationEventPublisher eventPublisher;
 
     @Transactional(rollbackFor = Exception.class)
     public OrderResponse createOrder(CreateOrderRequest request, String idempotencyKey) {
@@ -52,13 +52,14 @@ public class OrderService {
             return mapToResponse(existingOrder);
         }
 
-        // 2. Validate Request
-        validationService.validateOrderRequest(request);
+        // 2. Validate Request and Get User Details
+        com.payment.order.entity.User user = validationService.validateOrderRequest(request, idempotencyKey);
 
         // 3. Create Order
         Order order = Order.builder()
                 .username(request.getUserId())
                 .recipientBankAccount(request.getRecipientBankAccount())
+                .senderBankAccount(user.getAccountNumber())
                 .amount(request.getAmount())
                 .currency(request.getCurrency())
                 .description(request.getDescription())
@@ -70,25 +71,13 @@ public class OrderService {
 
         // 4. Save Idempotency Key
         idempotencyService.saveKey(idempotencyKey, savedOrder.getOrderId());
-
-        // 5. Publish Event (Synchronous to ensure rollback on failure)
-        OrderCreatedEvent event = OrderCreatedEvent.builder()
-                .orderId(savedOrder.getOrderId().toString())
-                .userId(savedOrder.getUsername())
-                .amount(savedOrder.getAmount())
-                .recipientAccount(savedOrder.getRecipientBankAccount())
-                .timestamp(savedOrder.getCreatedAt())
-                .build();
         
-        try {
-            kafkaProducer.sendOrderCreatedEventSync(event);
-            logger.info("Audit: Order created and event published | orderId: {} | correlationId: {}", 
-                    savedOrder.getOrderId(), correlationId);
-        } catch (Exception e) {
-            logger.error("Audit: Kafka failure - rolling back transaction | orderId: {} | error: {} | correlationId: {}", 
-                    savedOrder.getOrderId(), e.getMessage(), correlationId);
-            throw new RuntimeException("Reliability failure: Could not publish order event. Transaction rolled back.", e);
-        }
+        // 5. Publish Internal Event
+        // This will be caught by OrderEventListener AFTER the transaction commits
+        eventPublisher.publishEvent(new OrderCreatedInternalEvent(savedOrder));
+
+        logger.info("Order saved in database. Event queued for publication | orderId: {} | correlationId: {}", 
+                savedOrder.getOrderId(), correlationId);
 
         return mapToResponse(savedOrder);
     }
