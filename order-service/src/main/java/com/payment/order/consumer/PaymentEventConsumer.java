@@ -34,6 +34,11 @@ public class PaymentEventConsumer {
                     } else if ("FAILED".equalsIgnoreCase(event.getStatus())) {
                         order.setStatus(Order.OrderStatus.FAILED);
                     }
+                    
+                    order.setPaymentId(event.getPaymentId());
+                    order.setGatewayTransactionId(event.getGatewayTransactionId());
+                    order.setProcessedAt(event.getTimestamp());
+                    
                     orderRepository.save(order);
                     logger.info("Successfully updated order {} status to {}", order.getOrderId(), order.getStatus());
                 } else {

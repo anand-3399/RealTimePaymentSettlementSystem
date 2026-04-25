@@ -2,6 +2,7 @@ package com.payment.order.controller;
 
 import com.payment.order.dto.*;
 import com.payment.order.entity.RefreshToken;
+import com.payment.order.entity.User;
 import com.payment.order.security.JwtUtils;
 import com.payment.order.service.RefreshTokenService;
 import com.payment.order.service.UserService;
@@ -51,7 +52,7 @@ public class AuthController {
         RefreshToken refreshToken = tokenOpt.get();
         refreshTokenService.verifyExpiration(refreshToken);
 
-        com.payment.order.entity.User user = refreshToken.getUser();
+        User user = refreshToken.getUser();
 
         // 1. Generate NEW Access Token
         String token = jwtUtils.generateTokenFromUsername(user.getUsername());
