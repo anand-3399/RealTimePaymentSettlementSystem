@@ -34,9 +34,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationExceptions(MethodArgumentNotValidException ex) {
+        String fieldName = ex.getBindingResult().getFieldError().getField();
+        String errorMessage = ex.getBindingResult().getFieldError().getDefaultMessage();
+        
         ErrorResponse error = ErrorResponse.builder()
                 .error("VALIDATION_ERROR")
-                .message(ex.getBindingResult().getFieldError().getDefaultMessage())
+                .message("Field '" + fieldName + "' " + errorMessage)
                 .timestamp(LocalDateTime.now())
                 .build();
         return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);

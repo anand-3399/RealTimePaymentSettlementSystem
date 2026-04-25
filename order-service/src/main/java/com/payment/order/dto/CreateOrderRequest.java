@@ -22,6 +22,5 @@ public class CreateOrderRequest {
 
     private String description;
 
-    @NotBlank
-    private String idempotencyKey;
+
 }

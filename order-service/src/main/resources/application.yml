@@ -1,6 +1,8 @@
 spring:
   application:
     name: order-service
+  profiles:
+    active: local
 
   datasource:
     url: ${ORACLE_URL}

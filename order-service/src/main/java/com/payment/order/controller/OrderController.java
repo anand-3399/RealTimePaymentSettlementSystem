@@ -26,8 +26,10 @@ public class OrderController {
 
     @PostMapping
     @RateLimiter(name = "orderService")
-    public ResponseEntity<OrderResponse> createOrder(@Valid @RequestBody CreateOrderRequest request) {
-        return new ResponseEntity<>(orderService.createOrder(request), HttpStatus.CREATED);
+    public ResponseEntity<OrderResponse> createOrder(
+            @RequestHeader(value = "Idempotency-Key") String idempotencyKey,
+            @Valid @RequestBody CreateOrderRequest request) {
+        return new ResponseEntity<>(orderService.createOrder(request, idempotencyKey), HttpStatus.CREATED);
     }
 
     @GetMapping("/{orderId}")

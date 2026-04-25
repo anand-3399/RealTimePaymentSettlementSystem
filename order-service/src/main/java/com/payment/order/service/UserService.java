@@ -19,7 +19,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import lombok.extern.slf4j.Slf4j;
+
 @Service
+@Slf4j
 public class UserService {
 
     @Autowired
@@ -57,7 +60,7 @@ public class UserService {
                 .build();
 
         userRepository.save(user);
-        org.slf4j.LoggerFactory.getLogger(UserService.class).info("Audit: New user registered | username: {}", user.getUsername());
+        log.info("Audit: New user registered | username: {}", user.getUsername());
     }
 
     public JwtResponse authenticateUser(LoginRequest loginRequest) {
@@ -69,7 +72,7 @@ public class UserService {
 
         RefreshToken refreshToken = refreshTokenService.createRefreshToken(loginRequest.getUsername());
 
-        org.slf4j.LoggerFactory.getLogger(UserService.class).info("Audit: User authenticated successfully | username: {}", loginRequest.getUsername());
+        log.info("Audit: User authenticated successfully | username: {}", loginRequest.getUsername());
         return new JwtResponse(jwt, refreshToken.getToken(), loginRequest.getUsername());
     }
 

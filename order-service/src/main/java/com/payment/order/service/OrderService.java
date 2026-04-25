@@ -37,16 +37,16 @@ public class OrderService {
     private KafkaProducer kafkaProducer;
 
     @Transactional(rollbackFor = Exception.class)
-    public OrderResponse createOrder(CreateOrderRequest request) {
+    public OrderResponse createOrder(CreateOrderRequest request, String idempotencyKey) {
         String correlationId = MDC.get("correlationId");
         logger.info("Processing order creation | username: {} | amount: {} | correlationId: {}", 
                 request.getUserId(), request.getAmount(), correlationId);
 
         // 1. Check Idempotency
-        Optional<UUID> existingOrderId = idempotencyService.getOrderId(request.getIdempotencyKey());
+        Optional<UUID> existingOrderId = idempotencyService.getOrderId(idempotencyKey);
         if (existingOrderId.isPresent()) {
             logger.warn("Audit: Duplicate order attempt detected - returning cached response | idempotencyKey: {} | correlationId: {}", 
-                    request.getIdempotencyKey(), correlationId);
+                    idempotencyKey, correlationId);
             Order existingOrder = orderRepository.findById(existingOrderId.get())
                     .orElseThrow(() -> new RuntimeException("Order linked to idempotency key not found"));
             return mapToResponse(existingOrder);
@@ -69,7 +69,7 @@ public class OrderService {
         Order savedOrder = orderRepository.save(order);
 
         // 4. Save Idempotency Key
-        idempotencyService.saveKey(request.getIdempotencyKey(), savedOrder.getOrderId());
+        idempotencyService.saveKey(idempotencyKey, savedOrder.getOrderId());
 
         // 5. Publish Event (Synchronous to ensure rollback on failure)
         OrderCreatedEvent event = OrderCreatedEvent.builder()

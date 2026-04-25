@@ -8,7 +8,7 @@ CREATE TABLE refresh_tokens (
     CONSTRAINT fk_refresh_user FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
-CREATE INDEX idx_refresh_token ON refresh_tokens(token);
+
 CREATE INDEX idx_refresh_user_id ON refresh_tokens(user_id);
 
 -- Create Password Reset Tokens Table
@@ -21,5 +21,5 @@ CREATE TABLE password_reset_tokens (
     CONSTRAINT fk_reset_user FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
-CREATE INDEX idx_reset_token ON password_reset_tokens(token);
+
 CREATE INDEX idx_reset_user_id ON password_reset_tokens(user_id);
