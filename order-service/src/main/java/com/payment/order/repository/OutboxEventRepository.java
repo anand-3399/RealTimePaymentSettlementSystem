@@ -11,6 +11,11 @@ import java.util.UUID;
 public interface OutboxEventRepository extends JpaRepository<OutboxEvent, UUID> {
     List<OutboxEvent> findByStatusOrderByCreatedAtAsc(OutboxEvent.OutboxStatus status);
     
-    List<OutboxEvent> findByStatusAndRetryCountLessThanOrderByCreatedAtAsc(
-            OutboxEvent.OutboxStatus status, Integer maxRetries);
+    List<OutboxEvent> findByStatusAndRetryCountLessThanAndNextRetryAtBeforeOrderByCreatedAtAsc(
+            OutboxEvent.OutboxStatus status, Integer maxRetries, java.time.LocalDateTime nextRetryAt);
+            
+    default List<OutboxEvent> findReadyToPublish(Integer maxRetries) {
+        return findByStatusAndRetryCountLessThanAndNextRetryAtBeforeOrderByCreatedAtAsc(
+                OutboxEvent.OutboxStatus.PENDING, maxRetries, java.time.LocalDateTime.now());
+    }
 }

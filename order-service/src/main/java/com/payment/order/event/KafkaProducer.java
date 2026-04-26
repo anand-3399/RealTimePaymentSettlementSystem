@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -21,10 +22,10 @@ public class KafkaProducer {
         kafkaTemplate.send(TOPIC, event.getOrderId(), event).get(5, TimeUnit.SECONDS);
     }
 
-    public void sendOrderCreatedEventAsync(OrderCreatedEvent event) {
+    public CompletableFuture<?> sendOrderCreatedEventAsync(OrderCreatedEvent event) {
         logger.info("Publishing OrderCreatedEvent (Asynchronous): {} | correlationId: {}", 
                 event.getOrderId(), event.getCorrelationId());
-        // Non-blocking send
-        kafkaTemplate.send(TOPIC, event.getOrderId(), event);
+        // Returns the future so we can handle success/failure
+        return kafkaTemplate.send(TOPIC, event.getOrderId(), event);
     }
 }

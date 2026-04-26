@@ -3,6 +3,9 @@ spring:
     name: payment-processor
   profiles:
     active: local
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
 
   datasource:
     url: ${ORACLE_URL}

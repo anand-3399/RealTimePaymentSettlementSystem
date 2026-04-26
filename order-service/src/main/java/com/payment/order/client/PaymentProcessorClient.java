@@ -6,9 +6,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
@@ -37,9 +41,9 @@ public class PaymentProcessorClient {
             String url = processorUrl + processorPath + "?orderId=" + orderId;
             logger.info("Querying internal payment status for orderId: {} | URL: {}", orderId, url);
 
-            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+            HttpHeaders headers = new HttpHeaders();
             headers.set("X-Internal-Secret", internalSecret);
-            org.springframework.http.HttpEntity<String> entity = new org.springframework.http.HttpEntity<>(headers);
+            HttpEntity<String> entity = new HttpEntity<>(headers);
 
             ResponseEntity<PaymentStatusResponse> response = restTemplate.exchange(
                     url,
@@ -48,10 +52,10 @@ public class PaymentProcessorClient {
                     PaymentStatusResponse.class
             );
 
-            if (response.getStatusCode() == org.springframework.http.HttpStatus.OK) {
+            if (response.getStatusCode() == HttpStatus.OK) {
                 return Optional.ofNullable(response.getBody());
             }
-        } catch (org.springframework.web.client.HttpClientErrorException.NotFound e) {
+        } catch (HttpClientErrorException.NotFound e) {
             logger.warn("Payment not found yet for orderId: {}", orderId);
         } catch (Exception e) {
             logger.error("Failed to query internal payment processor for orderId: {} | Error: {}", orderId, e.getMessage());

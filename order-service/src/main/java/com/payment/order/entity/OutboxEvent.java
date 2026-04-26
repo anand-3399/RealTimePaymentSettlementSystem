@@ -35,9 +35,12 @@ public class OutboxEvent {
     private Integer retryCount = 0;
 
     @Column(nullable = false)
-    private LocalDateTime createdAt;
+    @Builder.Default
+    private LocalDateTime createdAt = LocalDateTime.now();
 
     private LocalDateTime publishedAt;
+
+    private LocalDateTime nextRetryAt;
 
     public enum OutboxStatus {
         PENDING, PUBLISHED, FAILED
