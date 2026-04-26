@@ -1,13 +1,16 @@
 package com.payment.order.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.payment.order.client.PaymentProcessorClient;
 import com.payment.order.dto.CreateOrderRequest;
 import com.payment.order.dto.OrderResponse;
 import com.payment.order.dto.PaymentStatusResponse;
 import com.payment.order.entity.Order;
+import com.payment.order.entity.OutboxEvent;
 import com.payment.order.entity.User;
-import com.payment.order.event.OrderCreatedInternalEvent;
+import com.payment.order.event.OrderCreatedEvent;
 import com.payment.order.repository.OrderRepository;
+import com.payment.order.repository.OutboxEventRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -38,6 +41,12 @@ public class OrderService {
 
     @Autowired
     private ApplicationEventPublisher eventPublisher;
+
+    @Autowired
+    private OutboxEventRepository outboxEventRepository;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Transactional(rollbackFor = Exception.class)
     public OrderResponse createOrder(CreateOrderRequest request, String idempotencyKey) {
@@ -76,12 +85,34 @@ public class OrderService {
         // 4. Save Idempotency Key
         idempotencyService.saveKey(idempotencyKey, savedOrder.getOrderId());
 
-        // 5. Publish Internal Event
-        // This will be caught by OrderEventListener AFTER the transaction commits
-        eventPublisher.publishEvent(new OrderCreatedInternalEvent(savedOrder));
+        // 5. Save to Outbox (Atomic with Order)
+        try {
+            OrderCreatedEvent kafkaEvent = OrderCreatedEvent.builder()
+                    .orderId(savedOrder.getOrderId().toString())
+                    .userId(savedOrder.getUsername())
+                    .amount(savedOrder.getAmount())
+                    .recipientAccount(savedOrder.getRecipientBankAccount())
+                    .senderAccount(savedOrder.getSenderBankAccount())
+                    .timestamp(savedOrder.getCreatedAt())
+                    .correlationId(correlationId)
+                    .build();
 
-        logger.info("Order saved in database. Event queued for publication | orderId: {} | correlationId: {}",
-                savedOrder.getOrderId(), correlationId);
+            OutboxEvent outboxEvent = OutboxEvent.builder()
+                    .eventType("OrderCreatedEvent")
+                    .payload(objectMapper.writeValueAsString(kafkaEvent))
+                    .status(OutboxEvent.OutboxStatus.PENDING)
+                    .createdAt(LocalDateTime.now())
+                    .build();
+
+            outboxEventRepository.save(outboxEvent);
+            logger.info("Order saved and event stored in outbox | orderId: {} | correlationId: {}",
+                    savedOrder.getOrderId(), correlationId);
+
+        } catch (Exception e) {
+            logger.error("Failed to serialize or save outbox event for order {}: {}", savedOrder.getOrderId(),
+                    e.getMessage());
+            throw new RuntimeException("Failed to prepare outbox event", e);
+        }
 
         return mapToResponse(savedOrder);
     }

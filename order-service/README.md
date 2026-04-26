@@ -8,7 +8,7 @@ The **Order Service** is the central entry point of the RTPS ecosystem. Built wi
 ## 🚀 Implemented Concepts (Production Hardened)
 
 ### 1. Advanced API Design & Reliability
-- **Non-Blocking Async Events**: Uses `@TransactionalEventListener` to decouple database transactions from Kafka publishing. This prevents API latency spikes and ensures that Kafka events are **only** sent after a successful database commit.
+- **Transactional Outbox Pattern**: Ensures 100% reliable event delivery. Instead of publishing directly to Kafka, events are saved to the Oracle DB in the same transaction as the Order. A background `OutboxPublisher` job then guarantees delivery to Kafka, even if the broker is temporarily offline.
 - **HTTP Header Idempotency**: Follows industry-standard API patterns (like OFSS/Stripe) by extracting the `Idempotency-Key` from the HTTP Headers. Includes strict validation (required, max 255 chars).
 - **Intelligent Error Handling**: Standardized JSON responses for all errors. Includes a specific handler for **429 Too Many Requests** when rate limits are exceeded.
 - **Server-Side Protection**: Configured Tomcat `connection-timeout` and `keep-alive-timeout` to protect system resources from slow or hanging client connections.
@@ -41,6 +41,36 @@ com.payment.order
 ├── repository/     # Spring Data JPA Repositories
 └── service/        # Core Business Logic & Validation Engine
 ```
+
+---
+
+## 🧠 Q&A: Problems Faced & Solutions Implemented
+
+### **Q: Why were internal calls between Order Service and Payment Processor failing with 401 Unauthorized?**
+**A:** The Payment Processor had Spring Security enabled but lacked configuration, so it defaulted to blocking all requests.
+**Solution:** We implemented a `SecurityConfig` in the Payment Processor that permits internal service-to-service calls authenticated by a shared secret header (`X-Internal-Secret`), while keeping the rest of the system secure.
+
+### **Q: Why did the Order Service show "payment: null" even after a payment had failed?**
+**A:** The Order Service only queried the Payment Processor if the local status was `PENDING`. If the status had already moved to `FAILED` (or if the first check failed due to the 401 error), it wouldn't try again.
+**Solution:** We added persistent fields (`payment_id`, `gateway_transaction_id`) to the `Order` entity and updated the logic to fetch these details if they are missing, regardless of the order status.
+
+### **Q: What happens if Kafka is down when an order is created?**
+**A:** Originally, the event was published directly from a listener. If Kafka was down, the event was lost forever.
+**Solution:** We implemented the **Transactional Outbox Pattern**. Events are now saved to an `outbox_events` table in the same database transaction as the order. A background job (`OutboxPublisher`) ensures they are reliably delivered to Kafka once the broker is back online.
+
+### **Q: How do we trace a single request across multiple microservices and Kafka?**
+**A:** We implemented **Distributed Tracing** using a `correlationId`.
+**Solution:** The `X-Correlation-ID` header is captured at the entry point, propagated into the Kafka message payload, and included in every log line via MDC. This allows us to see the entire lifecycle of a transaction across all logs.
+
+### **Q: Why were logs not generating or appearing as empty?**
+**A:** Both services were initially configured with conflicting log filenames or were writing to hidden directories depending on the IDE's working directory.
+**Solution:** We standardized the logging configuration in `application-local.yml` and assigned unique, explicit filenames (`order-service-debug.log` and `payment-processor-debug.log`) in the project root to ensure full visibility.
+
+### **Q: Why was Swagger UI showing a 403/401 error?**
+**A:** Spring Security was protecting all endpoints by default, including the documentation paths.
+**Solution:** We explicitly permitted `/v3/api-docs/**` and `/swagger-ui/**` in the `SecurityConfig` to allow developers to access the API documentation.
+
+---
 
 ## 🛠️ Tech Stack
 - **Core**: Java 17, Spring Boot 3.2

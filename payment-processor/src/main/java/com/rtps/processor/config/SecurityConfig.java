@@ -19,7 +19,8 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/payment-processor/internal/**").permitAll()
-                .requestMatchers("/api/v1/payments/**").permitAll() // Allowing public for now as per current state
+                .requestMatchers("/api/v1/payments/**").permitAll()
+                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/actuator/**").permitAll()
                 .anyRequest().authenticated()
             );
