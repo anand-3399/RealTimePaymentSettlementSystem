@@ -91,10 +91,12 @@ public class OrderService {
                     .orderId(savedOrder.getOrderId().toString())
                     .userId(savedOrder.getUsername())
                     .amount(savedOrder.getAmount())
+                    .currency(savedOrder.getCurrency())
                     .recipientAccount(savedOrder.getRecipientBankAccount())
                     .senderAccount(savedOrder.getSenderBankAccount())
                     .timestamp(savedOrder.getCreatedAt())
                     .correlationId(correlationId)
+                    .idempotencyKey(idempotencyKey)
                     .build();
 
             OutboxEvent outboxEvent = OutboxEvent.builder()

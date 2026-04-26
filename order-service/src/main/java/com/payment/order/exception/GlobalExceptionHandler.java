@@ -58,6 +58,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGlobalException(Exception ex) {
+        org.slf4j.LoggerFactory.getLogger(GlobalExceptionHandler.class)
+            .error("Unexpected error: {}", ex.getMessage(), ex);
+            
         ErrorResponse error = ErrorResponse.builder()
                 .error("INTERNAL_ERROR")
                 .message("An unexpected error occurred")

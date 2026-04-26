@@ -9,6 +9,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
+import java.util.UUID;
+
 @Component
 public class OrderEventConsumer {
 
@@ -26,7 +28,16 @@ public class OrderEventConsumer {
             logger.info("Received OrderCreatedEvent | orderId: {} | userId: {}", 
                     event.getOrderId(), event.getUserId());
             
-            paymentService.processPayment(event);
+            paymentService.processPayment(
+                UUID.fromString(event.getOrderId()),
+                event.getUserId(),
+                event.getAmount(),
+                event.getCurrency(),
+                event.getSenderAccount(),
+                event.getRecipientAccount(),
+                event.getCorrelationId(),
+                event.getIdempotencyKey()
+            );
             
         } catch (Exception e) {
             logger.error("Error processing OrderCreatedEvent | orderId: {} | error: {}", 

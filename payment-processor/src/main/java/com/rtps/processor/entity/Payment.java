@@ -54,14 +54,14 @@ public class Payment {
     private LocalDateTime nextRetryAt;
     
     private String correlationId;
-    
+    private String idempotencyKey;
     private LocalDateTime createdAt;
     private LocalDateTime processedAt;
     private LocalDateTime failedAt;
     private LocalDateTime updatedAt;
 
     public enum PaymentStatus {
-        PENDING, PROCESSING, COMPLETED, FAILED
+        PENDING, PROCESSING, COMPLETED, FAILED, PENDING_RETRY
     }
 
     @PrePersist

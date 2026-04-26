@@ -15,8 +15,10 @@ public class OrderCreatedEvent {
     private String orderId;
     private String userId;
     private BigDecimal amount;
+    private String currency;
     private String recipientAccount;
     private String senderAccount;
     private LocalDateTime timestamp;
     private String correlationId;
+    private String idempotencyKey;
 }

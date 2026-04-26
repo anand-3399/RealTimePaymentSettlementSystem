@@ -42,6 +42,27 @@ spring:
     enabled: true
     baseline-on-migrate: true
 
+resilience4j:
+  retry:
+    instances:
+      ajbank:
+        maxAttempts: 3
+        waitDuration: 2000
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        retryExceptions:
+          - org.springframework.web.client.HttpServerErrorException
+          - org.springframework.web.client.ResourceAccessException
+  circuitbreaker:
+    instances:
+      ajbank:
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 60000
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+
 server:
   port: 8082
 
@@ -51,7 +72,10 @@ ajbank:
     key: ${AJBANK_API_KEY}
 
 rtps:
-  internal-secret: ${INTERNAL_SERVICE_SECRET}
+  ajbank:
+    url: ${AJBANK_URL:http://localhost:8083}
+    secret: ${PROCESSOR_TO_AJBANK_SECRET}
+  inbound-secret: ${ORDER_TO_PROCESSOR_SECRET}
   encryption:
     key: ${ENCRYPTION_KEY}
 

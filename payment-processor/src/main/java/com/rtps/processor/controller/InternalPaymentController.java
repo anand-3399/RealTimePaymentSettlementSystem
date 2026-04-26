@@ -17,7 +17,7 @@ public class InternalPaymentController {
     @Autowired
     private PaymentService paymentService;
 
-    @Value("${rtps.internal-secret}")
+    @Value("${rtps.inbound-secret}")
     private String internalSecret;
 
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(InternalPaymentController.class);

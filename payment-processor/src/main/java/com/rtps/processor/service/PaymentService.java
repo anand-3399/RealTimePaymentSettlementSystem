@@ -1,6 +1,8 @@
 package com.rtps.processor.service;
 
 import com.rtps.processor.client.AJBankClient;
+import com.rtps.processor.dto.AJBankRequest;
+import com.rtps.processor.dto.AJBankResponse;
 import com.rtps.processor.dto.AnalyticsResponse;
 import com.rtps.processor.dto.OrderCreatedEvent;
 import com.rtps.processor.dto.PaymentProcessedEvent;
@@ -41,8 +43,9 @@ public class PaymentService {
     private com.rtps.processor.producer.KafkaProducer kafkaProducer;
 
     @Transactional
-    public void processPayment(OrderCreatedEvent event) {
-        UUID orderId = UUID.fromString(event.getOrderId());
+    public void processPayment(UUID orderId, String userId, BigDecimal amount, String currency, 
+                               String senderAccount, String recipientAccount, String correlationId, 
+                               String idempotencyKey) {
         
         // Check if payment already exists (idempotency)
         if (paymentRepository.findByOrderId(orderId).isPresent()) {
@@ -50,61 +53,64 @@ public class PaymentService {
             return;
         }
 
-        // 1. Create initial Payment record
         Payment payment = Payment.builder()
                 .orderId(orderId)
-                .userId(event.getUserId())
-                .senderAccount(event.getSenderAccount())
-                .recipientAccount(event.getRecipientAccount())
-                .amount(event.getAmount())
-                .currency("INR")
+                .userId(userId)
+                .amount(amount)
+                .currency(currency)
+                .senderAccount(senderAccount)
+                .recipientAccount(recipientAccount)
                 .status(Payment.PaymentStatus.PENDING)
-                .correlationId(event.getCorrelationId())
-                .retryCount(0)
-                .maxRetries(3)
+                .correlationId(correlationId)
+                .idempotencyKey(idempotencyKey)
+                .createdAt(LocalDateTime.now())
                 .build();
 
         payment = paymentRepository.save(payment);
-        logTransaction(payment, "INITIATED", null, "PENDING", "Payment flow started for order " + orderId);
 
-        executeBankTransfer(payment, event.getCorrelationId());
-    }
-
-    private void executeBankTransfer(Payment payment, String correlationId) {
         try {
-            // 2. Call AJBank
-            AJBankClient.AJBankResponse response = ajBankClient.transferMoney(
-                    payment.getSenderAccount(),
-                    payment.getRecipientAccount(),
-                    payment.getAmount(),
-                    correlationId
-            );
+            AJBankRequest ajRequest = AJBankRequest.builder()
+                    .senderAccount(senderAccount)
+                    .recipientAccount(recipientAccount)
+                    .amount(amount)
+                    .currency(currency)
+                    .idempotencyKey(idempotencyKey)
+                    .paymentProcessorId(payment.getId())
+                    .correlationId(correlationId)
+                    .build();
 
-            // 3. Update Payment based on response
-            payment.setGatewayTransactionId(response.getTransactionId());
-            payment.setGatewayResponse(response.getMessage());
-            
-            if ("SUCCESS".equalsIgnoreCase(response.getStatus())) {
+            AJBankResponse ajResponse = ajBankClient.transferMoney(ajRequest);
+
+            if ("COMPLETED".equals(ajResponse.getStatus())) {
                 payment.setStatus(Payment.PaymentStatus.COMPLETED);
-                payment.setProcessedAt(LocalDateTime.now());
-                logTransaction(payment, "COMPLETED", "PENDING", "COMPLETED", "Bank confirmed success: " + response.getTransactionId());
+                payment.setGatewayTransactionId(ajResponse.getTransactionId().toString());
+            } else if ("PENDING_RETRY".equals(ajResponse.getStatus())) {
+                payment.setStatus(Payment.PaymentStatus.PENDING_RETRY);
             } else {
                 payment.setStatus(Payment.PaymentStatus.FAILED);
-                payment.setFailedAt(LocalDateTime.now());
-                logTransaction(payment, "FAILED", "PENDING", "FAILED", "Bank rejected: " + response.getMessage());
             }
 
-        } catch (Exception e) {
-            logger.error("Payment processing failed for order {}: {}", payment.getOrderId(), e.getMessage());
-            payment.setStatus(Payment.PaymentStatus.FAILED);
-            payment.setFailedAt(LocalDateTime.now());
-            logTransaction(payment, "FAILED", "PENDING", "FAILED", "System Error: " + e.getMessage());
-        }
+            payment.setProcessedAt(LocalDateTime.now());
+            paymentRepository.save(payment);
 
-        paymentRepository.save(payment);
-        
-        // 4. Publish Event
-        publishProcessedEvent(payment);
+            // Log Transaction
+            logTransaction(payment, "AJBANK_TRANSFER", "PENDING", payment.getStatus().name(), "AJBank Response: " + ajResponse.getMessage());
+
+            // Notify Order Service
+            publishProcessedEvent(payment);
+
+        } catch (Exception e) {
+            logger.error("AJBank call failed for payment {}: {}", payment.getId(), e.getMessage());
+            payment.setStatus(Payment.PaymentStatus.FAILED);
+            paymentRepository.save(payment);
+            publishProcessedEvent(payment);
+        }
+    }
+
+    @Transactional
+    public void handleWebhook(String payload, String signature) {
+        logger.info("Handling AJBank Webhook | payload: {}", payload);
+        // Signature verification and parsing logic would go here
     }
 
     public PaymentResponse getPaymentDetails(UUID paymentId) {
@@ -119,7 +125,6 @@ public class PaymentService {
     }
 
     public List<PaymentResponse> listPayments(UUID orderId, String status) {
-        // Simple manual filtering for now
         return paymentRepository.findAll().stream()
                 .filter(p -> orderId == null || p.getOrderId().equals(orderId))
                 .filter(p -> status == null || p.getStatus().name().equalsIgnoreCase(status))
@@ -139,24 +144,24 @@ public class PaymentService {
         payment.setStatus(Payment.PaymentStatus.PENDING);
         payment.setRetryCount(payment.getRetryCount() + 1);
         paymentRepository.save(payment);
-        
-        logTransaction(payment, "RETRY", "FAILED", "PENDING", "Manual retry initiated. Count: " + payment.getRetryCount());
-        
-        executeBankTransfer(payment, payment.getCorrelationId());
-        
+
         return mapToResponse(payment);
     }
 
     public AnalyticsResponse getDailyAnalytics(LocalDate date) {
+        LocalDateTime startOfDay = date.atStartOfDay();
+        LocalDateTime endOfDay = date.plusDays(1).atStartOfDay();
+
         List<Payment> dailyPayments = paymentRepository.findAll().stream()
-                .filter(p -> p.getCreatedAt().toLocalDate().equals(date))
+                .filter(p -> p.getCreatedAt().isAfter(startOfDay) && p.getCreatedAt().isBefore(endOfDay))
                 .collect(Collectors.toList());
 
         long total = dailyPayments.size();
         long success = dailyPayments.stream().filter(p -> p.getStatus() == Payment.PaymentStatus.COMPLETED).count();
         long failure = dailyPayments.stream().filter(p -> p.getStatus() == Payment.PaymentStatus.FAILED).count();
-        
+
         BigDecimal totalAmount = dailyPayments.stream()
+                .filter(p -> p.getStatus() == Payment.PaymentStatus.COMPLETED)
                 .map(Payment::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -173,19 +178,6 @@ public class PaymentService {
                 .statusBreakdown(dailyPayments.stream()
                         .collect(Collectors.groupingBy(p -> p.getStatus().name(), Collectors.counting())))
                 .build();
-    }
-
-    @Transactional
-    public void handleWebhook(String payload, String signature) {
-        // 1. Verify signature (Mock)
-        if (signature == null || signature.isEmpty()) {
-            throw new RuntimeException("Invalid webhook signature");
-        }
-        
-        logger.info("Handling AJBank Webhook | payload: {}", payload);
-        
-        // TODO: Parse payload and update payment status
-        // This would involve finding the payment by gatewayTransactionId or orderId from the payload
     }
 
     private void publishProcessedEvent(Payment payment) {
@@ -232,7 +224,33 @@ public class PaymentService {
                 .toStatus(toStatus)
                 .message(message)
                 .correlationId(payment.getCorrelationId())
+                .createdAt(LocalDateTime.now())
                 .build();
         logRepository.save(log);
+    }
+
+    @Transactional
+    public void retryPaymentExecution(Payment payment) {
+        OrderCreatedEvent mockEvent = OrderCreatedEvent.builder()
+                .orderId(payment.getOrderId().toString())
+                .userId(payment.getUserId())
+                .amount(payment.getAmount())
+                .currency(payment.getCurrency())
+                .senderAccount(payment.getSenderAccount())
+                .recipientAccount(payment.getRecipientAccount())
+                .correlationId(payment.getCorrelationId())
+                .idempotencyKey(payment.getIdempotencyKey())
+                .build();
+        
+        processPayment(
+            UUID.fromString(mockEvent.getOrderId()),
+            mockEvent.getUserId(),
+            mockEvent.getAmount(),
+            mockEvent.getCurrency(),
+            mockEvent.getSenderAccount(),
+            mockEvent.getRecipientAccount(),
+            mockEvent.getCorrelationId(),
+            mockEvent.getIdempotencyKey()
+        );
     }
 }

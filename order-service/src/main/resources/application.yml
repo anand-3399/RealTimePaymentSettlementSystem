@@ -52,7 +52,7 @@ rtps:
   payment-processor:
     url: ${PAYMENT_PROCESSOR_URL}
     path: ${PAYMENT_PROCESSOR_PATH}
-    secret: ${INTERNAL_SERVICE_SECRET}
+    secret: ${ORDER_TO_PROCESSOR_SECRET}
   encryption:
     key: ${ENCRYPTION_KEY}
 

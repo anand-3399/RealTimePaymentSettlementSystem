@@ -1,81 +1,70 @@
 package com.rtps.processor.client;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import com.rtps.processor.dto.AJBankRequest;
+import com.rtps.processor.dto.AJBankResponse;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
+import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.http.*;
 
-import java.math.BigDecimal;
-import java.util.UUID;
+import java.time.Duration;
 
-@Service
+@Component
 public class AJBankClient {
 
     private static final Logger logger = LoggerFactory.getLogger(AJBankClient.class);
 
     private final RestTemplate restTemplate;
-    private final String apiUrl;
-    private final String apiKey;
+    private final String ajBankUrl;
+    private final String internalSecret;
 
-    public AJBankClient(@Value("${ajbank.api.url}") String apiUrl, 
-                        @Value("${ajbank.api.key}") String apiKey) {
-        this.restTemplate = new RestTemplate();
-        this.apiUrl = apiUrl;
-        this.apiKey = apiKey;
+    public AJBankClient(
+            RestTemplateBuilder builder,
+            @Value("${rtps.ajbank.url}") String ajBankUrl,
+            @Value("${rtps.ajbank.secret}") String internalSecret) {
+        
+        this.restTemplate = builder
+                .setConnectTimeout(Duration.ofSeconds(2))
+                .setReadTimeout(Duration.ofSeconds(5))
+                .build();
+        this.ajBankUrl = ajBankUrl;
+        this.internalSecret = internalSecret;
     }
 
-    public AJBankResponse transferMoney(String sender, String recipient, BigDecimal amount, String correlationId) {
-        String url = apiUrl + "/api/transfer";
+    @Retry(name = "ajbank")
+    @CircuitBreaker(name = "ajbank", fallbackMethod = "fallbackTransfer")
+    public AJBankResponse transferMoney(AJBankRequest request) {
+        String url = ajBankUrl + "/api/transfer";
         
-        AJBankRequest request = AJBankRequest.builder()
-                .senderAccount(sender)
-                .recipientAccount(recipient)
-                .amount(amount)
-                .idempotencyKey(UUID.randomUUID().toString())
-                .correlationId(correlationId)
-                .build();
-
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("Authorization", "Bearer " + apiKey);
-        headers.set("X-Correlation-ID", correlationId);
+        headers.set("X-Internal-Secret", internalSecret);
+        headers.set("X-Correlation-ID", request.getCorrelationId());
 
         HttpEntity<AJBankRequest> entity = new HttpEntity<>(request, headers);
 
-        try {
-            logger.info("Calling AJBank API | amount: {} | sender: {}", amount, sender);
-            ResponseEntity<AJBankResponse> response = restTemplate.postForEntity(url, entity, AJBankResponse.class);
-            return response.getBody();
-        } catch (Exception e) {
-            logger.error("AJBank API Call Failed | error: {}", e.getMessage());
-            throw new RuntimeException("AJBank communication failure: " + e.getMessage());
-        }
+        logger.info("Calling AJBank for transfer | sender: {} | amount: {} | correlationId: {}", 
+                request.getSenderAccount(), request.getAmount(), request.getCorrelationId());
+
+        ResponseEntity<AJBankResponse> response = restTemplate.postForEntity(url, entity, AJBankResponse.class);
+        
+        return response.getBody();
     }
 
-    @Data
-    @Builder
-    @AllArgsConstructor
-    @NoArgsConstructor
-    public static class AJBankRequest {
-        private String senderAccount;
-        private String recipientAccount;
-        private BigDecimal amount;
-        private String idempotencyKey;
-        private String correlationId;
-    }
-
-    @Data
-    @AllArgsConstructor
-    @NoArgsConstructor
-    public static class AJBankResponse {
-        private String transactionId;
-        private String status; // SUCCESS, REJECTED, PENDING
-        private String message;
+    public AJBankResponse fallbackTransfer(AJBankRequest request, Throwable t) {
+        logger.error("AJBank fallback triggered for order {} | Error: {}", request.getIdempotencyKey(), t.getMessage());
+        return AJBankResponse.builder()
+                .status("PENDING_RETRY")
+                .message("AJBank is currently unavailable. Payment will be retried.")
+                .correlationId(request.getCorrelationId())
+                .build();
     }
 }
