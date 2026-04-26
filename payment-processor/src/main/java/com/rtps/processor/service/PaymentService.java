@@ -106,6 +106,51 @@ public class PaymentService {
             publishProcessedEvent(payment);
         }
     }
+    
+    
+    @Transactional
+    public void retryPayment(Payment payment) {
+
+//        payment = paymentRepository.save(payment);
+
+        try {
+            AJBankRequest ajRequest = AJBankRequest.builder()
+                    .senderAccount(payment.getSenderAccount())
+                    .recipientAccount(payment.getRecipientAccount())
+                    .amount(payment.getAmount())
+                    .currency(payment.getCurrency())
+                    .idempotencyKey(payment.getIdempotencyKey())
+                    .paymentProcessorId(payment.getId())
+                    .correlationId(payment.getCorrelationId())
+                    .build();
+
+            AJBankResponse ajResponse = ajBankClient.transferMoney(ajRequest);
+
+            if ("COMPLETED".equals(ajResponse.getStatus())) {
+                payment.setStatus(Payment.PaymentStatus.COMPLETED);
+                payment.setGatewayTransactionId(ajResponse.getTransactionId().toString());
+            } else if ("PENDING_RETRY".equals(ajResponse.getStatus())) {
+                payment.setStatus(Payment.PaymentStatus.PENDING_RETRY);
+            } else {
+                payment.setStatus(Payment.PaymentStatus.FAILED);
+            }
+
+            payment.setProcessedAt(LocalDateTime.now());
+            paymentRepository.save(payment);
+
+            // Log Transaction
+            logTransaction(payment, "AJBANK_TRANSFER", "PENDING_RETRY", payment.getStatus().name(), "AJBank Response: " + ajResponse.getMessage());
+
+            // Notify Order Service
+            publishProcessedEvent(payment);
+
+        } catch (Exception e) {
+            logger.error("AJBank call failed for payment {}: {}", payment.getId(), e.getMessage());
+            payment.setStatus(Payment.PaymentStatus.FAILED);
+            paymentRepository.save(payment);
+            publishProcessedEvent(payment);
+        }
+    }
 
     @Transactional
     public void handleWebhook(String payload, String signature) {
@@ -231,26 +276,8 @@ public class PaymentService {
 
     @Transactional
     public void retryPaymentExecution(Payment payment) {
-        OrderCreatedEvent mockEvent = OrderCreatedEvent.builder()
-                .orderId(payment.getOrderId().toString())
-                .userId(payment.getUserId())
-                .amount(payment.getAmount())
-                .currency(payment.getCurrency())
-                .senderAccount(payment.getSenderAccount())
-                .recipientAccount(payment.getRecipientAccount())
-                .correlationId(payment.getCorrelationId())
-                .idempotencyKey(payment.getIdempotencyKey())
-                .build();
-        
-        processPayment(
-            UUID.fromString(mockEvent.getOrderId()),
-            mockEvent.getUserId(),
-            mockEvent.getAmount(),
-            mockEvent.getCurrency(),
-            mockEvent.getSenderAccount(),
-            mockEvent.getRecipientAccount(),
-            mockEvent.getCorrelationId(),
-            mockEvent.getIdempotencyKey()
+        retryPayment(
+            payment
         );
     }
 }

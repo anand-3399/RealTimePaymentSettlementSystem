@@ -21,13 +21,11 @@ public class OrderEventConsumer {
 
     @KafkaListener(topics = "order-events", groupId = "payment-processor-group")
     public void consume(OrderCreatedEvent event) {
-        // Set Correlation ID for logging
         MDC.put("correlationId", event.getCorrelationId());
-        
         try {
-            logger.info("Received OrderCreatedEvent | orderId: {} | userId: {}", 
+            logger.info("Received OrderCreatedEvent | orderId: {} | userId: {}",
                     event.getOrderId(), event.getUserId());
-            
+
             paymentService.processPayment(
                 UUID.fromString(event.getOrderId()),
                 event.getUserId(),
@@ -38,9 +36,8 @@ public class OrderEventConsumer {
                 event.getCorrelationId(),
                 event.getIdempotencyKey()
             );
-            
         } catch (Exception e) {
-            logger.error("Error processing OrderCreatedEvent | orderId: {} | error: {}", 
+            logger.error("Error processing OrderCreatedEvent | orderId: {} | error: {}",
                     event.getOrderId(), e.getMessage());
         } finally {
             MDC.remove("correlationId");

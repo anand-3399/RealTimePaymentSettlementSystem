@@ -16,6 +16,6 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, UUID> 
             
     default List<OutboxEvent> findReadyToPublish(Integer maxRetries) {
         return findByStatusAndRetryCountLessThanAndNextRetryAtBeforeOrderByCreatedAtAsc(
-                OutboxEvent.OutboxStatus.PENDING, maxRetries, java.time.LocalDateTime.now());
+                OutboxEvent.OutboxStatus.PENDING, maxRetries, java.time.LocalDateTime.now().plusSeconds(1));
     }
 }
