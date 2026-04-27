@@ -22,6 +22,10 @@ server:
 
 rtps:
   inbound-secret: ${PROCESSOR_TO_AJBANK_SECRET}
+  ajbank:
+    webhook:
+      url: ${RTPS_AJBANK_WEBHOOK_URL}
+      secret: ${RTPS_AJBANK_WEBHOOK_SECRET}
 
 logging:
   level:

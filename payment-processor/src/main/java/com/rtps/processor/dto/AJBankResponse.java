@@ -21,7 +21,7 @@ public class AJBankResponse {
     private String currency;
     private String senderAccount;
     private String recipientAccount;
-    private LocalDateTime completedAt;
+    private String completedAt;
     private String correlationId;
     private String message;
 }

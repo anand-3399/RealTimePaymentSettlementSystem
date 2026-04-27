@@ -35,10 +35,10 @@ public class WebhookEmitterService {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @Value("${rtps.ajbank.webhook.url:http://localhost:8082/api/v1/payments/webhook}")
+    @Value("${rtps.ajbank.webhook.url}")
     private String webhookUrl;
 
-    @Value("${rtps.ajbank.webhook.secret:RTPS_WEBHOOK_SECRET_2026}")
+    @Value("${rtps.ajbank.webhook.secret}")
     private String webhookSecret;
 
     @Async
@@ -67,7 +67,8 @@ public class WebhookEmitterService {
                 logger.info("Webhook delivered successfully | correlationId: {} | status: {}", correlationId, status);
             } catch (org.springframework.web.client.HttpStatusCodeException e) {
                 status = e.getStatusCode().value();
-                logger.warn("Webhook delivery failed with status {} | correlationId: {}", status, correlationId);
+                logger.warn("Webhook delivery failed with status {} | correlationId: {} | Response: {}", 
+                        status, correlationId, e.getResponseBodyAsString());
             } catch (Exception e) {
                 status = 500;
                 logger.error("Webhook delivery failed due to network error | correlationId: {} | error: {}", 

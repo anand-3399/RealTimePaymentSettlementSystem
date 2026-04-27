@@ -18,4 +18,4 @@ public class OrderServiceApplication {
         return new org.springframework.web.client.RestTemplate();
     }
 }
- 
+  

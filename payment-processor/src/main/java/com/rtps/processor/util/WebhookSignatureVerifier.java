@@ -23,7 +23,7 @@ public class WebhookSignatureVerifier {
             String calculatedSignature = generateSignature(payload, webhookSecret);
             boolean isValid = calculatedSignature.equals(incomingSignature);
             if (!isValid) {
-                logger.warn("Webhook signature verification failed! Calculated: {} | Received: {}", 
+                logger.warn("Webhook signature mismatch! Calculated: {} | Received: {}", 
                         calculatedSignature, incomingSignature);
             }
             return isValid;

@@ -51,8 +51,10 @@ public class PaymentService {
                                String idempotencyKey) {
         
         // Check if payment already exists (idempotency)
-        if (paymentRepository.findByOrderId(orderId).isPresent()) {
-            logger.warn("Payment already exists for orderId: {}", orderId);
+        java.util.Optional<Payment> existingPayment = paymentRepository.findByOrderId(orderId);
+        if (existingPayment.isPresent()) {
+            logger.warn("Payment already exists for orderId: {} | currentStatus: {}", 
+                    orderId, existingPayment.get().getStatus());
             return;
         }
 
@@ -87,8 +89,8 @@ public class PaymentService {
             if ("COMPLETED".equals(ajResponse.getStatus())) {
                 payment.setStatus(Payment.PaymentStatus.COMPLETED);
                 payment.setGatewayTransactionId(ajResponse.getTransactionId().toString());
-            } else if ("PENDING_RETRY".equals(ajResponse.getStatus())) {
-                payment.setStatus(Payment.PaymentStatus.PENDING_RETRY);
+            } else if ("PENDING".equals(ajResponse.getStatus()) || "PENDING_RETRY".equals(ajResponse.getStatus())) {
+                payment.setStatus(Payment.PaymentStatus.PENDING);
             } else {
                 payment.setStatus(Payment.PaymentStatus.FAILED);
             }
@@ -100,8 +102,13 @@ public class PaymentService {
             // Log Transaction
             logTransaction(payment, "AJBANK_TRANSFER", "PENDING", payment.getStatus().name(), "AJBank Response: " + ajResponse.getMessage());
 
-            // Notify Order Service
-            publishProcessedEvent(payment);
+            // ONLY notify Order Service if we have a final result (COMPLETED or FAILED)
+            // If it's PENDING, we wait for the Webhook!
+            if (payment.getStatus() != Payment.PaymentStatus.PENDING) {
+                publishProcessedEvent(payment);
+            } else {
+                logger.info("Payment {} is PENDING at AJBank. Waiting for webhook.", payment.getId());
+            }
 
         } catch (Exception e) {
             logger.error("AJBank call failed for payment {}: {}", payment.getId(), e.getMessage());
@@ -115,9 +122,6 @@ public class PaymentService {
     
     @Transactional
     public void retryPayment(Payment payment) {
-
-//        payment = paymentRepository.save(payment);
-
         try {
             AJBankRequest ajRequest = AJBankRequest.builder()
                     .senderAccount(payment.getSenderAccount())
@@ -134,20 +138,23 @@ public class PaymentService {
             if ("COMPLETED".equals(ajResponse.getStatus())) {
                 payment.setStatus(Payment.PaymentStatus.COMPLETED);
                 payment.setGatewayTransactionId(ajResponse.getTransactionId().toString());
-            } else if ("PENDING_RETRY".equals(ajResponse.getStatus())) {
-                payment.setStatus(Payment.PaymentStatus.PENDING_RETRY);
+            } else if ("PENDING".equals(ajResponse.getStatus()) || "PENDING_RETRY".equals(ajResponse.getStatus())) {
+                payment.setStatus(Payment.PaymentStatus.PENDING);
             } else {
                 payment.setStatus(Payment.PaymentStatus.FAILED);
             }
 
             payment.setProcessedAt(LocalDateTime.now());
+            payment.setGatewayResponse(ajResponse.getMessage());
             paymentRepository.save(payment);
 
             // Log Transaction
             logTransaction(payment, "AJBANK_TRANSFER", "PENDING_RETRY", payment.getStatus().name(), "AJBank Response: " + ajResponse.getMessage());
 
-            // Notify Order Service
-            publishProcessedEvent(payment);
+            // ONLY notify Order Service if we have a final result
+            if (payment.getStatus() != Payment.PaymentStatus.PENDING) {
+                publishProcessedEvent(payment);
+            }
 
         } catch (Exception e) {
             logger.error("AJBank call failed for payment {}: {}", payment.getId(), e.getMessage());
@@ -162,28 +169,47 @@ public class PaymentService {
 
     @Transactional
     public void handleWebhook(String payload, String signature) {
-        logger.info("Handling AJBank Webhook | signature: {}", signature);
+        logger.info("Received Webhook | signature: {}", signature);
         
         // 1. Verify Signature
         if (!signatureVerifier.verifySignature(payload, signature)) {
-            logger.error("Invalid webhook signature! Ignoring payload.");
-            throw new RuntimeException("Invalid webhook signature");
+            logger.error("Webhook Signature Mismatch!");
+            throw new RuntimeException("Webhook Signature Validation Failed");
         }
 
         try {
             // 2. Parse Payload
-            AJBankResponse ajResponse = objectMapper.readValue(payload, AJBankResponse.class);
+            AJBankResponse ajResponse;
+            try {
+                ajResponse = objectMapper.readValue(payload, AJBankResponse.class);
+            } catch (Exception parseEx) {
+                logger.error("JSON Parsing failed for webhook payload: {}", parseEx.getMessage());
+                throw new RuntimeException("Webhook JSON Parsing Failed: " + parseEx.getMessage());
+            }
+
             String correlationId = ajResponse.getCorrelationId();
+            logger.info("Processing webhook for correlationId: {} | status: {}", correlationId, ajResponse.getStatus());
 
-            logger.info("Parsed webhook payload for correlationId: {} | status: {}", correlationId, ajResponse.getStatus());
+            // 3. Find and Update the latest Payment attempt (with retry for race conditions)
+            java.util.Optional<Payment> paymentOpt = paymentRepository.findTopByCorrelationIdOrderByCreatedAtDesc(correlationId);
+            
+            if (paymentOpt.isEmpty()) {
+                logger.info("Payment not found for correlationId: {}. Waiting 500ms for race condition...", correlationId);
+                try { Thread.sleep(500); } catch (InterruptedException ignored) {}
+                paymentOpt = paymentRepository.findTopByCorrelationIdOrderByCreatedAtDesc(correlationId);
+            }
 
-            // 3. Find and Update Payment
-            paymentRepository.findByCorrelationId(correlationId).ifPresentOrElse(payment -> {
+            paymentOpt.ifPresentOrElse(payment -> {
+                logger.info("Found payment {} for webhook. Current status: {}", payment.getId(), payment.getStatus());
+                
+                // Log receipt in a SEPARATE transaction so it's never rolled back
+                logTransactionInternal(payment, "AJBANK_WEBHOOK_RECEIVED", payment.getStatus().name(), 
+                        payment.getStatus().name(), "Webhook received: " + ajResponse.getStatus());
+
                 if (payment.getStatus() == Payment.PaymentStatus.PENDING || 
                     payment.getStatus() == Payment.PaymentStatus.PENDING_RETRY) {
                     
-                    logger.info("Updating payment {} status via webhook to {}", payment.getId(), ajResponse.getStatus());
-                    
+                    String oldStatus = payment.getStatus().name();
                     if ("COMPLETED".equals(ajResponse.getStatus())) {
                         payment.setStatus(Payment.PaymentStatus.COMPLETED);
                         payment.setGatewayTransactionId(ajResponse.getTransactionId().toString());
@@ -191,25 +217,29 @@ public class PaymentService {
                         payment.setStatus(Payment.PaymentStatus.FAILED);
                     }
                     
-                    payment.setGatewayResponse(ajResponse.getMessage() + " (Updated via Webhook)");
+                    payment.setGatewayResponse(ajResponse.getMessage());
                     payment.setProcessedAt(LocalDateTime.now());
                     paymentRepository.save(payment);
                     
-                    // Log Transaction
-                    logTransaction(payment, "AJBANK_WEBHOOK", payment.getStatus().name(), payment.getStatus().name(), "Webhook processed successfully");
+                    logger.info("Payment {} updated to {} via webhook", payment.getId(), payment.getStatus());
+                    
+                    // Log the state change
+                    logTransactionInternal(payment, "AJBANK_WEBHOOK_UPDATE", oldStatus, 
+                            payment.getStatus().name(), "Status updated via webhook: " + ajResponse.getMessage());
 
-                    // Notify Order Service
-                    publishProcessedEvent(payment);
+                    try {
+                        publishProcessedEvent(payment);
+                    } catch (Exception kafkaEx) {
+                        logger.error("Failed to notify Kafka after webhook update: {}", kafkaEx.getMessage());
+                    }
                 } else {
-                    logger.info("Payment {} already in final status {}. Webhook ignored.", payment.getId(), payment.getStatus());
+                    logger.info("Payment {} already in final status {}. No update needed.", payment.getId(), payment.getStatus());
                 }
-            }, () -> {
-                logger.warn("Payment not found for correlationId: {} in webhook", correlationId);
-            });
+            }, () -> logger.warn("No payment found for correlationId: {} after retry.", correlationId));
 
         } catch (Exception e) {
-            logger.error("Error processing webhook payload: {} | Payload: {}", e.getMessage(), payload, e);
-            throw new RuntimeException("Failed to process webhook payload", e);
+            logger.error("Critical error in handleWebhook: {}", e.getMessage(), e);
+            throw new RuntimeException("Webhook processing failed", e);
         }
     }
 
@@ -318,17 +348,26 @@ public class PaymentService {
         return "****" + account.substring(account.length() - 4);
     }
 
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public void logTransactionInternal(Payment payment, String action, String fromStatus, String toStatus, String message) {
+        try {
+            PaymentTransactionLog log = PaymentTransactionLog.builder()
+                    .payment(payment)
+                    .action(action)
+                    .fromStatus(fromStatus)
+                    .toStatus(toStatus)
+                    .message(message)
+                    .correlationId(payment.getCorrelationId())
+                    .createdAt(LocalDateTime.now())
+                    .build();
+            logRepository.save(log);
+        } catch (Exception e) {
+            logger.error("Failed to persist transaction log: {}", e.getMessage());
+        }
+    }
+
     private void logTransaction(Payment payment, String action, String fromStatus, String toStatus, String message) {
-        PaymentTransactionLog log = PaymentTransactionLog.builder()
-                .payment(payment)
-                .action(action)
-                .fromStatus(fromStatus)
-                .toStatus(toStatus)
-                .message(message)
-                .correlationId(payment.getCorrelationId())
-                .createdAt(LocalDateTime.now())
-                .build();
-        logRepository.save(log);
+        logTransactionInternal(payment, action, fromStatus, toStatus, message);
     }
 
     @Transactional
