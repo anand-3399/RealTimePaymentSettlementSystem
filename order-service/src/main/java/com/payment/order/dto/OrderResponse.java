@@ -30,5 +30,6 @@ public class OrderResponse {
         private UUID paymentId;
         private String gatewayTransactionId;
         private LocalDateTime processedAt;
+        private String reason;
     }
 }

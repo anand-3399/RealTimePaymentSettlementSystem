@@ -22,7 +22,7 @@ public class PaymentRetryScheduler {
 
 	@Autowired
 	private PaymentService paymentService;
-
+ 
 	@Scheduled(fixedDelay = 6000) // Every 1 minute
 	public void retryPendingPayments() {
 		logger.debug("Running background payment retry job...");

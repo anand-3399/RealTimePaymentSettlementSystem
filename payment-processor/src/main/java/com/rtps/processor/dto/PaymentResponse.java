@@ -25,4 +25,5 @@ public class PaymentResponse {
     private LocalDateTime processedAt;
     private LocalDateTime createdAt;
     private String correlationId;
+    private String message;
 }

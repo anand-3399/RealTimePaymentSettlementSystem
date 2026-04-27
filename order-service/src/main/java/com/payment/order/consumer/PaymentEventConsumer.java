@@ -38,6 +38,7 @@ public class PaymentEventConsumer {
                     order.setPaymentId(event.getPaymentId());
                     order.setGatewayTransactionId(event.getGatewayTransactionId());
                     order.setProcessedAt(event.getTimestamp());
+                    order.setReason(event.getMessage());
                     
                     orderRepository.save(order);
                     logger.info("Successfully updated order {} status to {}", order.getOrderId(), order.getStatus());

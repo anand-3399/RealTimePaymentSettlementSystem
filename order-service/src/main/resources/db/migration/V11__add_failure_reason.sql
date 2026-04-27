@@ -1,0 +1,1 @@
+ALTER TABLE payment_orders ADD reason VARCHAR2(2000);

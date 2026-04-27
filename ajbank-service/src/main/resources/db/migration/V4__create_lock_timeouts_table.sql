@@ -1,0 +1,6 @@
+CREATE TABLE lock_timeouts (
+    id RAW(16) DEFAULT SYS_GUID() PRIMARY KEY,
+    correlation_id VARCHAR2(100) NOT NULL,
+    message VARCHAR2(500),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+);

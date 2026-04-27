@@ -20,5 +20,6 @@ public class PaymentProcessedEvent {
     private String status;
     private String gatewayTransactionId;
     private String correlationId;
+    private String message;
     private LocalDateTime timestamp;
 }

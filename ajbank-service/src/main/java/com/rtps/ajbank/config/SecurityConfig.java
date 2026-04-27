@@ -52,14 +52,17 @@ public class SecurityConfig {
                 throws ServletException, IOException {
             
             String requestSecret = request.getHeader("X-Internal-Secret");
-            System.out.println("Expected: " + secret);
-            System.out.println("Received: " + requestSecret);
+            // System.out.println("Expected: " + secret);
+            // System.out.println("Received: " + requestSecret);
             if (secret.equals(requestSecret)) {
                 // Manually set authentication for the internal service
                 org.springframework.security.authentication.UsernamePasswordAuthenticationToken auth = 
                     new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
                         "INTERNAL_SERVICE", null, java.util.Collections.emptyList());
                 org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(auth);
+            } else{
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                return;
             }
 
             filterChain.doFilter(request, response);

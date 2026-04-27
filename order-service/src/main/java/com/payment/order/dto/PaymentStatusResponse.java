@@ -19,4 +19,5 @@ public class PaymentStatusResponse {
     private String gatewayTransactionId;
     private LocalDateTime processedAt;
     private String correlationId;
+    private String message;
 }

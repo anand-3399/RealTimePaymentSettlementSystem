@@ -13,8 +13,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
-
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
 
 @Component
@@ -33,7 +34,7 @@ public class AJBankClient {
         
         this.restTemplate = builder
                 .setConnectTimeout(Duration.ofSeconds(2))
-                .setReadTimeout(Duration.ofSeconds(5))
+                .setReadTimeout(Duration.ofSeconds(10))
                 .build();
         this.ajBankUrl = ajBankUrl;
         this.internalSecret = internalSecret;
@@ -54,11 +55,32 @@ public class AJBankClient {
         logger.info("Calling AJBank for transfer | sender: {} | amount: {} | correlationId: {}", 
                 request.getSenderAccount(), request.getAmount(), request.getCorrelationId());
 
-        ResponseEntity<AJBankResponse> response = restTemplate.postForEntity(url, entity, AJBankResponse.class);
-        
-        return response.getBody();
-    }
+        try {
+            ResponseEntity<AJBankResponse> response = restTemplate.postForEntity(url, entity, AJBankResponse.class);
+            return response.getBody();
+        } catch (HttpStatusCodeException e) {
+            if (e.getStatusCode().value() == 409) {
+                logger.warn("AJBank returned 409 Conflict (Account Locked) | correlationId: {}", request.getCorrelationId());
+                return AJBankResponse.builder()
+                        .status("PENDING_RETRY")
+                        .message("Account is currently busy. Payment will be retried.")
+                        .correlationId(request.getCorrelationId())
+                        .build();
+            }
 
+            try {
+                // Try to parse the structured error response from AJBank (e.g. 400 Bad Request for insufficient funds)
+                ObjectMapper mapper = new ObjectMapper();
+                AJBankResponse errorResponse = mapper.readValue(e.getResponseBodyAsString(), AJBankResponse.class);
+                logger.warn("AJBank returned business error {} | correlationId: {} | message: {}", 
+                        e.getStatusCode(), request.getCorrelationId(), errorResponse.getMessage());
+                return errorResponse;
+            } catch (Exception parseException) {
+                // Not a structured response, let Resilience4j handle it as a failure
+                throw e;
+            }
+        }
+    }
     public AJBankResponse fallbackTransfer(AJBankRequest request, Throwable t) {
         logger.error("AJBank fallback triggered for order {} | Error: {}", request.getIdempotencyKey(), t.getMessage());
         return AJBankResponse.builder()

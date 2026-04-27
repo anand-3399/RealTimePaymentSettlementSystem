@@ -50,8 +50,12 @@ public class Order {
     private UUID paymentId;
     private String gatewayTransactionId;
     private LocalDateTime processedAt;
+    
+    @Column(length = 2000, name = "reason")
+    private String reason;
 
     public enum OrderStatus {
         PENDING, SUCCESS, FAILED, COMPLETED
     }
 }
+ 
