@@ -36,6 +36,9 @@ public class TransferService {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private WebhookEmitterService webhookEmitterService;
+
     @Transactional(rollbackFor = Exception.class)
     public TransferResponse processTransfer(TransferRequest request) {
         String correlationId = request.getCorrelationId();
@@ -46,7 +49,11 @@ public class TransferService {
             Optional<IdempotencyKey> existingKey = idempotencyRepository.findByIdempotencyKey(request.getIdempotencyKey());
             if (existingKey.isPresent()) {
                 logger.info("Duplicate request detected | idempotencyKey: {}. Returning cached response.", request.getIdempotencyKey());
-                return objectMapper.readValue(existingKey.get().getResponseBody(), TransferResponse.class);
+                TransferResponse response = objectMapper.readValue(existingKey.get().getResponseBody(), TransferResponse.class);
+                
+                webhookEmitterService.sendWebhook(response);
+                
+                return response;
             }
 
             // 2. ACID Transfer with Locking
@@ -55,18 +62,18 @@ public class TransferService {
 
             // Lock accounts to prevent concurrent updates
             BankAccount sender = accountRepository.findByAccountNumberWithLock(request.getSenderAccount())
-                    .orElseThrow(() -> new RuntimeException("Sender account not found: " + request.getSenderAccount()));
+                    .orElseThrow(() -> new com.rtps.ajbank.exception.BusinessValidationException("Sender account not found: " + request.getSenderAccount()));
 
             BankAccount recipient = accountRepository.findByAccountNumberWithLock(request.getRecipientAccount())
-                    .orElseThrow(() -> new RuntimeException("Recipient account not found: " + request.getRecipientAccount()));
+                    .orElseThrow(() -> new com.rtps.ajbank.exception.BusinessValidationException("Recipient account not found: " + request.getRecipientAccount()));
 
             // Validation
             if (sender.getBalance().compareTo(request.getAmount()) < 0) {
-                throw new RuntimeException("Insufficient balance in sender account");
+                throw new com.rtps.ajbank.exception.BusinessValidationException("Insufficient balance in sender account");
             }
 
             if (!"ACTIVE".equals(sender.getStatus()) || !"ACTIVE".equals(recipient.getStatus())) {
-                throw new RuntimeException("One or both accounts are not ACTIVE");
+                throw new com.rtps.ajbank.exception.BusinessValidationException("One or both accounts are not ACTIVE");
             }
 
             // Perform Debit/Credit
@@ -95,6 +102,7 @@ public class TransferService {
             TransferResponse response = TransferResponse.builder()
                     .transactionId(savedTx.getId())
                     .status("COMPLETED")
+                    .message("Transfer completed successfully")
                     .amount(request.getAmount())
                     .currency(request.getCurrency())
                     .senderAccount(request.getSenderAccount())
@@ -113,9 +121,17 @@ public class TransferService {
             
             idempotencyRepository.save(key);
 
+            webhookEmitterService.sendWebhook(response);
+
             logger.info("ACID transfer completed successfully | txnId: {}", savedTx.getId());
             return response;
 
+        } catch (com.rtps.ajbank.exception.BusinessValidationException e) {
+            logger.warn("Business validation failed | error: {}", e.getMessage());
+            throw e;
+        } catch (org.springframework.dao.DataAccessException e) {
+            logger.warn("Data access exception (e.g. Lock Timeout) | error: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             logger.error("ACID transfer failed | error: {}", e.getMessage());
             throw new RuntimeException("Transfer failed: " + e.getMessage(), e);

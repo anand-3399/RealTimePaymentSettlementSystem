@@ -42,6 +42,9 @@ public class PaymentService {
     @Autowired
     private com.rtps.processor.producer.KafkaProducer kafkaProducer;
 
+    @Autowired
+    private com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+
     @Transactional
     public void processPayment(UUID orderId, String userId, BigDecimal amount, String currency, 
                                String senderAccount, String recipientAccount, String correlationId, 
@@ -90,6 +93,7 @@ public class PaymentService {
                 payment.setStatus(Payment.PaymentStatus.FAILED);
             }
 
+            payment.setGatewayResponse(ajResponse.getMessage());
             payment.setProcessedAt(LocalDateTime.now());
             paymentRepository.save(payment);
 
@@ -102,6 +106,7 @@ public class PaymentService {
         } catch (Exception e) {
             logger.error("AJBank call failed for payment {}: {}", payment.getId(), e.getMessage());
             payment.setStatus(Payment.PaymentStatus.FAILED);
+            payment.setGatewayResponse(e.getMessage());
             paymentRepository.save(payment);
             publishProcessedEvent(payment);
         }
@@ -152,10 +157,60 @@ public class PaymentService {
         }
     }
 
+    @Autowired
+    private com.rtps.processor.util.WebhookSignatureVerifier signatureVerifier;
+
     @Transactional
     public void handleWebhook(String payload, String signature) {
-        logger.info("Handling AJBank Webhook | payload: {}", payload);
-        // Signature verification and parsing logic would go here
+        logger.info("Handling AJBank Webhook | signature: {}", signature);
+        
+        // 1. Verify Signature
+        if (!signatureVerifier.verifySignature(payload, signature)) {
+            logger.error("Invalid webhook signature! Ignoring payload.");
+            throw new RuntimeException("Invalid webhook signature");
+        }
+
+        try {
+            // 2. Parse Payload
+            AJBankResponse ajResponse = objectMapper.readValue(payload, AJBankResponse.class);
+            String correlationId = ajResponse.getCorrelationId();
+
+            logger.info("Parsed webhook payload for correlationId: {} | status: {}", correlationId, ajResponse.getStatus());
+
+            // 3. Find and Update Payment
+            paymentRepository.findByCorrelationId(correlationId).ifPresentOrElse(payment -> {
+                if (payment.getStatus() == Payment.PaymentStatus.PENDING || 
+                    payment.getStatus() == Payment.PaymentStatus.PENDING_RETRY) {
+                    
+                    logger.info("Updating payment {} status via webhook to {}", payment.getId(), ajResponse.getStatus());
+                    
+                    if ("COMPLETED".equals(ajResponse.getStatus())) {
+                        payment.setStatus(Payment.PaymentStatus.COMPLETED);
+                        payment.setGatewayTransactionId(ajResponse.getTransactionId().toString());
+                    } else if ("FAILED".equals(ajResponse.getStatus())) {
+                        payment.setStatus(Payment.PaymentStatus.FAILED);
+                    }
+                    
+                    payment.setGatewayResponse(ajResponse.getMessage() + " (Updated via Webhook)");
+                    payment.setProcessedAt(LocalDateTime.now());
+                    paymentRepository.save(payment);
+                    
+                    // Log Transaction
+                    logTransaction(payment, "AJBANK_WEBHOOK", payment.getStatus().name(), payment.getStatus().name(), "Webhook processed successfully");
+
+                    // Notify Order Service
+                    publishProcessedEvent(payment);
+                } else {
+                    logger.info("Payment {} already in final status {}. Webhook ignored.", payment.getId(), payment.getStatus());
+                }
+            }, () -> {
+                logger.warn("Payment not found for correlationId: {} in webhook", correlationId);
+            });
+
+        } catch (Exception e) {
+            logger.error("Error processing webhook payload: {} | Payload: {}", e.getMessage(), payload, e);
+            throw new RuntimeException("Failed to process webhook payload", e);
+        }
     }
 
     public PaymentResponse getPaymentDetails(UUID paymentId) {
@@ -234,6 +289,7 @@ public class PaymentService {
                 .status(payment.getStatus().name())
                 .gatewayTransactionId(payment.getGatewayTransactionId())
                 .correlationId(payment.getCorrelationId())
+                .message(payment.getGatewayResponse())
                 .timestamp(LocalDateTime.now())
                 .build();
         kafkaProducer.publishPaymentProcessed(event);
@@ -253,6 +309,7 @@ public class PaymentService {
                 .processedAt(payment.getProcessedAt())
                 .createdAt(payment.getCreatedAt())
                 .correlationId(payment.getCorrelationId())
+                .message(payment.getGatewayResponse())
                 .build();
     }
 

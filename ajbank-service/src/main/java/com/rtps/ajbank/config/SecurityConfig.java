@@ -9,6 +9,9 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.context.annotation.Bean;
+
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

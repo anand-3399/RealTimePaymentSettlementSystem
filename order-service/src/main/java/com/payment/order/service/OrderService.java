@@ -107,9 +107,12 @@ public class OrderService {
                     .build();
 
             outboxEventRepository.save(outboxEvent);
+            
+            // 6. Publish local event for eager outbox publishing
+            eventPublisher.publishEvent(new com.payment.order.event.OutboxEventCreated(this));
+
             logger.info("Order saved and event stored in outbox | orderId: {} | correlationId: {}",
                     savedOrder.getOrderId(), correlationId);
-
         } catch (Exception e) {
             logger.error("Failed to serialize or save outbox event for order {}: {}", savedOrder.getOrderId(),
                     e.getMessage());
@@ -147,6 +150,7 @@ public class OrderService {
                 order.setPaymentId(payment.getPaymentId());
                 order.setGatewayTransactionId(payment.getGatewayTransactionId());
                 order.setProcessedAt(payment.getProcessedAt());
+                order.setReason(payment.getMessage());
                 orderRepository.save(order);
 
                 return mapToResponse(order);
@@ -183,6 +187,7 @@ public class OrderService {
                     .paymentId(order.getPaymentId())
                     .gatewayTransactionId(order.getGatewayTransactionId())
                     .processedAt(order.getProcessedAt())
+                    .reason(order.getReason())
                     .build());
         }
 
