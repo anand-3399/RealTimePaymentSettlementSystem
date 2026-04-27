@@ -14,7 +14,7 @@ RTPS is a high-performance, production-grade microservices ecosystem designed fo
 - **UI Portal (Port 8000)**: Management dashboard built with Oracle JET.
 
 
-![RTPS Architecture](architecture\RTPS_Architecture_V2.svg)
+![RTPS Architecture](architecture/RTPS_Architecture_V2.svg)
 
 ## 🛠️ Global Tech Stack
 - **Languages**: Java 17, Javascript
