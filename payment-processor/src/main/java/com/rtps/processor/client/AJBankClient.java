@@ -62,8 +62,9 @@ public class AJBankClient {
             if (e.getStatusCode().value() == 409) {
                 logger.warn("AJBank returned 409 Conflict (Account Locked) | correlationId: {}", request.getCorrelationId());
                 return AJBankResponse.builder()
-                        .status("PENDING_RETRY")
+                        .status("LOCKED_PENDING_RETRY")
                         .message("Account is currently busy. Payment will be retried.")
+                        .retryReason("ACCOUNT_LOCKED")
                         .correlationId(request.getCorrelationId())
                         .build();
             }
@@ -86,6 +87,7 @@ public class AJBankClient {
         return AJBankResponse.builder()
                 .status("PENDING_RETRY")
                 .message("AJBank is currently unavailable. Payment will be retried.")
+                .retryReason("BANK_UNAVAILABLE")
                 .correlationId(request.getCorrelationId())
                 .build();
     }

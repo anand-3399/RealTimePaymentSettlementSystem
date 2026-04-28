@@ -57,11 +57,17 @@ public class Payment {
     private String idempotencyKey;
     private LocalDateTime createdAt;
     private LocalDateTime processedAt;
+    private LocalDateTime lastFailedAt;
     private LocalDateTime failedAt;
     private LocalDateTime updatedAt;
 
+    @Enumerated(EnumType.STRING)
+    private RetryReason retryReason;
+    
+    private Integer lockedContentionCount = 0;
+
     public enum PaymentStatus {
-        PENDING, PROCESSING, COMPLETED, FAILED, PENDING_RETRY
+        PENDING, PROCESSING, COMPLETED, FAILED, PENDING_RETRY, LOCKED_PENDING_RETRY, SENT_AWAITING_RESPONSE
     }
 
     @PrePersist
@@ -70,6 +76,7 @@ public class Payment {
         updatedAt = LocalDateTime.now();
         if (retryCount == null) retryCount = 0;
         if (maxRetries == null) maxRetries = 3;
+        if (lockedContentionCount == null) lockedContentionCount = 0;
     }
 
     @PreUpdate

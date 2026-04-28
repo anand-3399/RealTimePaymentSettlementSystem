@@ -11,6 +11,8 @@ import com.rtps.processor.entity.Payment;
 import com.rtps.processor.entity.PaymentTransactionLog;
 import com.rtps.processor.repository.PaymentRepository;
 import com.rtps.processor.repository.PaymentTransactionLogRepository;
+import com.rtps.processor.entity.RetryReason;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,7 +52,7 @@ public class PaymentService {
                                String senderAccount, String recipientAccount, String correlationId, 
                                String idempotencyKey) {
         
-        // Check if payment already exists (idempotency)
+        // 1. Idempotency Check
         java.util.Optional<Payment> existingPayment = paymentRepository.findByOrderId(orderId);
         if (existingPayment.isPresent()) {
             logger.warn("Payment already exists for orderId: {} | currentStatus: {}", 
@@ -58,6 +60,7 @@ public class PaymentService {
             return;
         }
 
+        // 2. Initial Save as PENDING
         Payment payment = Payment.builder()
                 .orderId(orderId)
                 .userId(userId)
@@ -69,59 +72,17 @@ public class PaymentService {
                 .correlationId(correlationId)
                 .idempotencyKey(idempotencyKey)
                 .createdAt(LocalDateTime.now())
+                .retryCount(0)
+                .maxRetries(10) // Allow more retries for high volume
                 .build();
 
         payment = paymentRepository.save(payment);
 
-        try {
-            AJBankRequest ajRequest = AJBankRequest.builder()
-                    .senderAccount(senderAccount)
-                    .recipientAccount(recipientAccount)
-                    .amount(amount)
-                    .currency(currency)
-                    .idempotencyKey(idempotencyKey)
-                    .paymentProcessorId(payment.getId())
-                    .correlationId(correlationId)
-                    .build();
-
-            AJBankResponse ajResponse = ajBankClient.transferMoney(ajRequest);
-
-            if ("COMPLETED".equals(ajResponse.getStatus())) {
-                payment.setStatus(Payment.PaymentStatus.COMPLETED);
-                payment.setGatewayTransactionId(ajResponse.getTransactionId().toString());
-            } else if ("PENDING".equals(ajResponse.getStatus()) || "PENDING_RETRY".equals(ajResponse.getStatus())) {
-                payment.setStatus(Payment.PaymentStatus.PENDING);
-            } else {
-                payment.setStatus(Payment.PaymentStatus.FAILED);
-            }
-
-            payment.setGatewayResponse(ajResponse.getMessage());
-            payment.setProcessedAt(LocalDateTime.now());
-            paymentRepository.save(payment);
-
-            // Log Transaction
-            logTransaction(payment, "AJBANK_TRANSFER", "PENDING", payment.getStatus().name(), "AJBank Response: " + ajResponse.getMessage());
-
-            // ONLY notify Order Service if we have a final result (COMPLETED or FAILED)
-            // If it's PENDING, we wait for the Webhook!
-            if (payment.getStatus() != Payment.PaymentStatus.PENDING) {
-                publishProcessedEvent(payment);
-            } else {
-                logger.info("Payment {} is PENDING at AJBank. Waiting for webhook.", payment.getId());
-            }
-
-        } catch (Exception e) {
-            logger.error("AJBank call failed for payment {}: {}", payment.getId(), e.getMessage());
-            payment.setStatus(Payment.PaymentStatus.FAILED);
-            payment.setGatewayResponse(e.getMessage());
-            paymentRepository.save(payment);
-            publishProcessedEvent(payment);
-        }
+        // 3. Bank Handshake
+        executeHandshake(payment);
     }
-    
-    
-    @Transactional
-    public void retryPayment(Payment payment) {
+
+    private void executeHandshake(Payment payment) {
         try {
             AJBankRequest ajRequest = AJBankRequest.builder()
                     .senderAccount(payment.getSenderAccount())
@@ -135,34 +96,84 @@ public class PaymentService {
 
             AJBankResponse ajResponse = ajBankClient.transferMoney(ajRequest);
 
-            if ("COMPLETED".equals(ajResponse.getStatus())) {
-                payment.setStatus(Payment.PaymentStatus.COMPLETED);
-                payment.setGatewayTransactionId(ajResponse.getTransactionId().toString());
-            } else if ("PENDING".equals(ajResponse.getStatus()) || "PENDING_RETRY".equals(ajResponse.getStatus())) {
-                payment.setStatus(Payment.PaymentStatus.PENDING);
+            // 4. Handle Response based on Implementation Plan
+            if ("LOCKED_PENDING_RETRY".equals(ajResponse.getStatus())) {
+                handleLockContention(payment, ajResponse.getMessage());
+            } else if ("PENDING_RETRY".equals(ajResponse.getStatus())) {
+                handleInfrastructureFailure(payment, ajResponse.getMessage());
             } else {
-                payment.setStatus(Payment.PaymentStatus.FAILED);
-            }
-
-            payment.setProcessedAt(LocalDateTime.now());
-            payment.setGatewayResponse(ajResponse.getMessage());
-            paymentRepository.save(payment);
-
-            // Log Transaction
-            logTransaction(payment, "AJBANK_TRANSFER", "PENDING_RETRY", payment.getStatus().name(), "AJBank Response: " + ajResponse.getMessage());
-
-            // ONLY notify Order Service if we have a final result
-            if (payment.getStatus() != Payment.PaymentStatus.PENDING) {
-                publishProcessedEvent(payment);
+                // Handshake OK (200) -> Move to SENT_AWAITING_RESPONSE
+                payment.setStatus(Payment.PaymentStatus.SENT_AWAITING_RESPONSE);
+                payment.setGatewayResponse(ajResponse.getMessage());
+                payment.setProcessedAt(LocalDateTime.now());
+                paymentRepository.save(payment);
+                
+                logger.info("Handshake successful for payment {}. Status: SENT_AWAITING_RESPONSE. Waiting for webhook.", payment.getId());
+                logTransaction(payment, "AJBANK_HANDSHAKE", "PENDING", "SENT_AWAITING_RESPONSE", "Handshake Accepted: " + ajResponse.getMessage());
             }
 
         } catch (Exception e) {
-            logger.error("AJBank call failed for payment {}: {}", payment.getId(), e.getMessage());
-            payment.setStatus(Payment.PaymentStatus.FAILED);
-            paymentRepository.save(payment);
-            publishProcessedEvent(payment);
+            logger.error("AJBank handshake exception for payment {}: {}", payment.getId(), e.getMessage());
+            handleInfrastructureFailure(payment, e.getMessage());
         }
     }
+
+    private void handleLockContention(Payment payment, String message) {
+        String oldStatus = payment.getStatus().name();
+        payment.setStatus(Payment.PaymentStatus.LOCKED_PENDING_RETRY);
+        payment.setRetryReason(RetryReason.ACCOUNT_LOCKED);
+        payment.setLockedContentionCount(payment.getLockedContentionCount() + 1);
+        
+        // Exponential backoff: 5s, 10s, 20s... (capped at 30 min)
+        long delaySeconds = Math.min(5L * (long) Math.pow(2, payment.getRetryCount()), 1800L);
+        payment.setNextRetryAt(LocalDateTime.now().plusSeconds(delaySeconds));
+        payment.setGatewayResponse(message);
+        paymentRepository.save(payment);
+
+        logger.warn("Account Locked for payment {}. Retrying in {}s | attempt: {}", payment.getId(), delaySeconds, payment.getRetryCount());
+        logTransaction(payment, "LOCK_CONTENTION", oldStatus, "LOCKED_PENDING_RETRY", message);
+    }
+
+    private void handleInfrastructureFailure(Payment payment, String message) {
+        String oldStatus = payment.getStatus().name();
+        payment.setStatus(Payment.PaymentStatus.PENDING_RETRY);
+        payment.setRetryReason(RetryReason.BANK_UNAVAILABLE);
+        
+        // Exponential backoff: 30s, 60s, 120s... (capped at 30 min)
+        // Development override: 20s
+        long initialDelay = 30L; 
+        long delaySeconds = Math.min(initialDelay * (long) Math.pow(2, payment.getRetryCount()), 1800L);
+        
+        payment.setNextRetryAt(LocalDateTime.now().plusSeconds(delaySeconds));
+        payment.setGatewayResponse(message);
+        paymentRepository.save(payment);
+
+        logger.warn("Bank Unavailable for payment {}. Retrying in {}s | attempt: {}", payment.getId(), delaySeconds, payment.getRetryCount());
+        logTransaction(payment, "INFRA_FAILURE", oldStatus, "PENDING_RETRY", message);
+    }
+
+    @Transactional
+    public void retryPaymentExecution(Payment payment) {
+        logger.info("Executing retry for payment {} | status: {} | attempt: {}", 
+                payment.getId(), payment.getStatus(), payment.getRetryCount());
+        
+        payment.setRetryCount(payment.getRetryCount() + 1);
+        payment.setLastFailedAt(LocalDateTime.now());
+        
+        if (payment.getRetryCount() > payment.getMaxRetries()) {
+            logger.error("Max retries exceeded for payment {}. Marking as FAILURE.", payment.getId());
+            payment.setStatus(Payment.PaymentStatus.FAILED);
+            payment.setGatewayResponse("Max retries exceeded");
+            paymentRepository.save(payment);
+            publishProcessedEvent(payment);
+            logTransaction(payment, "MAX_RETRIES_EXCEEDED", payment.getStatus().name(), "FAILURE", "Maximum retry attempts reached");
+            return;
+        }
+
+        executeHandshake(payment);
+    }
+    
+    
 
     @Autowired
     private com.rtps.processor.util.WebhookSignatureVerifier signatureVerifier;
@@ -206,8 +217,11 @@ public class PaymentService {
                 logTransactionInternal(payment, "AJBANK_WEBHOOK_RECEIVED", payment.getStatus().name(), 
                         payment.getStatus().name(), "Webhook received: " + ajResponse.getStatus());
 
-                if (payment.getStatus() == Payment.PaymentStatus.PENDING || 
-                    payment.getStatus() == Payment.PaymentStatus.PENDING_RETRY) {
+                if (payment.getStatus() == Payment.PaymentStatus.SENT_AWAITING_RESPONSE || 
+                    payment.getStatus() == Payment.PaymentStatus.PENDING || 
+                    payment.getStatus() == Payment.PaymentStatus.PENDING_RETRY ||
+                    payment.getStatus() == Payment.PaymentStatus.LOCKED_PENDING_RETRY ||
+                    payment.getStatus() == Payment.PaymentStatus.FAILED) { // FAILURE -> COMPLETED allowed
                     
                     String oldStatus = payment.getStatus().name();
                     if ("COMPLETED".equals(ajResponse.getStatus())) {
@@ -370,10 +384,4 @@ public class PaymentService {
         logTransactionInternal(payment, action, fromStatus, toStatus, message);
     }
 
-    @Transactional
-    public void retryPaymentExecution(Payment payment) {
-        retryPayment(
-            payment
-        );
-    }
 }

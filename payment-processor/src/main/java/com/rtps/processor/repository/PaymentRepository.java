@@ -14,4 +14,7 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
     Optional<Payment> findByGatewayTransactionId(String gatewayTransactionId);
     Optional<Payment> findTopByCorrelationIdOrderByCreatedAtDesc(String correlationId);
 	List<Payment> findByStatusIn(List<PaymentStatus> statuses);
+
+    @org.springframework.data.jpa.repository.Query("SELECT p FROM Payment p WHERE p.status IN :statuses AND (p.nextRetryAt IS NULL OR p.nextRetryAt <= :now)")
+    List<Payment> findPaymentsDueForRetry(java.util.List<PaymentStatus> statuses, java.time.LocalDateTime now);
 }

@@ -24,4 +24,5 @@ public class AJBankResponse {
     private String completedAt;
     private String correlationId;
     private String message;
+    private String retryReason; // Added for advanced resilience
 }
