@@ -7,9 +7,6 @@ import java.math.BigDecimal;
 @Data
 public class CreateOrderRequest {
     @NotBlank
-    private String userId;
-
-    @NotBlank
     @Pattern(regexp = "^[0-9]{8,18}$", message = "Invalid bank account format. Must be 8-18 digits.")
     private String recipientBankAccount;
 

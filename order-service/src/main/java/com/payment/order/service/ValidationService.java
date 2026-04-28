@@ -15,15 +15,15 @@ public class ValidationService {
     @Autowired
     private UserRepository userRepository;
 
-    public com.payment.order.entity.User validateOrderRequest(CreateOrderRequest request, String idempotencyKey) {
+    public com.payment.order.entity.User validateOrderRequest(CreateOrderRequest request, String userId, String idempotencyKey) {
         validateIdempotencyKey(idempotencyKey);
         
         if (request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
             throw new InvalidOrderException("Amount must be greater than 0");
         }
 
-        return userRepository.findByUsername(request.getUserId())
-                .orElseThrow(() -> new UserNotFoundException("User '" + request.getUserId() + "' does not exist"));
+        return userRepository.findByUsername(userId)
+                .orElseThrow(() -> new UserNotFoundException("User '" + userId + "' does not exist"));
     }
 
     private void validateIdempotencyKey(String key) {

@@ -11,6 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -28,8 +29,10 @@ public class OrderController {
     @RateLimiter(name = "orderService")
     public ResponseEntity<OrderResponse> createOrder(
             @RequestHeader(value = "Idempotency-Key") String idempotencyKey,
-            @Valid @RequestBody CreateOrderRequest request) {
-        return new ResponseEntity<>(orderService.createOrder(request, idempotencyKey), HttpStatus.CREATED);
+            @Valid @RequestBody CreateOrderRequest request,
+            Authentication authentication) {
+        String userId = authentication.getName();
+        return new ResponseEntity<>(orderService.createOrder(request, userId, idempotencyKey), HttpStatus.CREATED);
     }
 
     @GetMapping("/{orderId}")
@@ -39,10 +42,11 @@ public class OrderController {
 
     @GetMapping
     public ResponseEntity<Page<OrderResponse>> getOrdersByUserId(
-            @RequestParam String userId,
+            Authentication authentication,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         
+        String userId = authentication.getName();
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         return ResponseEntity.ok(orderService.getOrdersByUserIdPaged(userId, pageable));
     }

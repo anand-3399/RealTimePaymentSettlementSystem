@@ -49,10 +49,10 @@ public class OrderService {
     private ObjectMapper objectMapper;
 
     @Transactional(rollbackFor = Exception.class)
-    public OrderResponse createOrder(CreateOrderRequest request, String idempotencyKey) {
+    public OrderResponse createOrder(CreateOrderRequest request, String userId, String idempotencyKey) {
         String correlationId = MDC.get("correlationId");
         logger.info("Processing order creation | username: {} | amount: {} | correlationId: {}",
-                request.getUserId(), request.getAmount(), correlationId);
+                userId, request.getAmount(), correlationId);
 
         // 1. Check Idempotency
         Optional<UUID> existingOrderId = idempotencyService.getOrderId(idempotencyKey);
@@ -66,11 +66,11 @@ public class OrderService {
         }
 
         // 2. Validate Request and Get User Details
-        com.payment.order.entity.User user = validationService.validateOrderRequest(request, idempotencyKey);
+        com.payment.order.entity.User user = validationService.validateOrderRequest(request, userId, idempotencyKey);
 
         // 3. Create Order
         Order order = Order.builder()
-                .username(request.getUserId())
+                .username(userId)
                 .recipientBankAccount(request.getRecipientBankAccount())
                 .senderBankAccount(user.getAccountNumber())
                 .amount(request.getAmount())
