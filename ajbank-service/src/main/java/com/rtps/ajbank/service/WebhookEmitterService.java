@@ -13,6 +13,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 
 import javax.crypto.Mac;
@@ -65,7 +66,7 @@ public class WebhookEmitterService {
                 var response = restTemplate.postForEntity(webhookUrl, entity, String.class);
                 status = response.getStatusCode().value();
                 logger.info("Webhook delivered successfully | correlationId: {} | status: {}", correlationId, status);
-            } catch (org.springframework.web.client.HttpStatusCodeException e) {
+            } catch (HttpStatusCodeException e) {
                 status = e.getStatusCode().value();
                 logger.warn("Webhook delivery failed with status {} | correlationId: {} | Response: {}", 
                         status, correlationId, e.getResponseBodyAsString());

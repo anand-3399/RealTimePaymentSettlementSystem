@@ -3,6 +3,7 @@ package com.rtps.ajbank.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -59,8 +60,7 @@ public class SecurityConfig {
             // System.out.println("Received: " + requestSecret);
             if (secret.equals(requestSecret)) {
                 // Manually set authentication for the internal service
-                org.springframework.security.authentication.UsernamePasswordAuthenticationToken auth = 
-                    new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                         "INTERNAL_SERVICE", null, java.util.Collections.emptyList());
                 org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(auth);
             } else{

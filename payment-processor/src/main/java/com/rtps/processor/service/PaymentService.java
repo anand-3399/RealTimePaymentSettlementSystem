@@ -1,5 +1,6 @@
 package com.rtps.processor.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rtps.processor.client.AJBankClient;
 import com.rtps.processor.dto.AJBankRequest;
 import com.rtps.processor.dto.AJBankResponse;
@@ -12,6 +13,8 @@ import com.rtps.processor.entity.PaymentTransactionLog;
 import com.rtps.processor.repository.PaymentRepository;
 import com.rtps.processor.repository.PaymentTransactionLogRepository;
 import com.rtps.processor.entity.RetryReason;
+import com.rtps.processor.producer.KafkaProducer;
+
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,6 +27,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -42,10 +46,10 @@ public class PaymentService {
     private AJBankClient ajBankClient;
 
     @Autowired
-    private com.rtps.processor.producer.KafkaProducer kafkaProducer;
+    private KafkaProducer kafkaProducer;
 
     @Autowired
-    private com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    private ObjectMapper objectMapper;
 
     @Transactional
     public void processPayment(UUID orderId, String userId, BigDecimal amount, String currency, 
@@ -53,7 +57,7 @@ public class PaymentService {
                                String idempotencyKey) {
         
         // 1. Idempotency Check
-        java.util.Optional<Payment> existingPayment = paymentRepository.findByOrderId(orderId);
+        Optional<Payment> existingPayment = paymentRepository.findByOrderId(orderId);
         if (existingPayment.isPresent()) {
             logger.warn("Payment already exists for orderId: {} | currentStatus: {}", 
                     orderId, existingPayment.get().getStatus());
@@ -202,7 +206,7 @@ public class PaymentService {
             logger.info("Processing webhook for correlationId: {} | status: {}", correlationId, ajResponse.getStatus());
 
             // 3. Find and Update the latest Payment attempt (with retry for race conditions)
-            java.util.Optional<Payment> paymentOpt = paymentRepository.findTopByCorrelationIdOrderByCreatedAtDesc(correlationId);
+            Optional<Payment> paymentOpt = paymentRepository.findTopByCorrelationIdOrderByCreatedAtDesc(correlationId);
             
             if (paymentOpt.isEmpty()) {
                 logger.info("Payment not found for correlationId: {}. Waiting 500ms for race condition...", correlationId);

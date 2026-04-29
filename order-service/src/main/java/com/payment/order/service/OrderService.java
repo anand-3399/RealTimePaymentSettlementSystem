@@ -9,6 +9,7 @@ import com.payment.order.entity.Order;
 import com.payment.order.entity.OutboxEvent;
 import com.payment.order.entity.User;
 import com.payment.order.event.OrderCreatedEvent;
+import com.payment.order.event.OutboxEventCreated;
 import com.payment.order.repository.OrderRepository;
 import com.payment.order.repository.OutboxEventRepository;
 import org.slf4j.Logger;
@@ -66,7 +67,7 @@ public class OrderService {
         }
 
         // 2. Validate Request and Get User Details
-        com.payment.order.entity.User user = validationService.validateOrderRequest(request, userId, idempotencyKey);
+        User user = validationService.validateOrderRequest(request, userId, idempotencyKey);
 
         // 3. Create Order
         Order order = Order.builder()
@@ -109,7 +110,7 @@ public class OrderService {
             outboxEventRepository.save(outboxEvent);
             
             // 6. Publish local event for eager outbox publishing
-            eventPublisher.publishEvent(new com.payment.order.event.OutboxEventCreated(this));
+            eventPublisher.publishEvent(new OutboxEventCreated(this));
 
             logger.info("Order saved and event stored in outbox | orderId: {} | correlationId: {}",
                     savedOrder.getOrderId(), correlationId);

@@ -1,6 +1,7 @@
 package com.payment.order.service;
 
 import com.payment.order.dto.CreateOrderRequest;
+import com.payment.order.entity.User;
 import com.payment.order.exception.InvalidOrderException;
 import com.payment.order.exception.UserNotFoundException;
 import com.payment.order.repository.UserRepository;
@@ -15,7 +16,7 @@ public class ValidationService {
     @Autowired
     private UserRepository userRepository;
 
-    public com.payment.order.entity.User validateOrderRequest(CreateOrderRequest request, String userId, String idempotencyKey) {
+    public User validateOrderRequest(CreateOrderRequest request, String userId, String idempotencyKey) {
         validateIdempotencyKey(idempotencyKey);
         
         if (request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
