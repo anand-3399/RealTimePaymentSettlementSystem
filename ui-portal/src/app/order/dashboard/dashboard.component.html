@@ -35,7 +35,7 @@
         <div class="stat-icon" style="color: var(--success); background: rgba(16,185,129,0.1)"><iconify-icon icon="lucide:check-circle"></iconify-icon></div>
         <div class="stat-info">
           <h3>Success</h3>
-          <p>{{ orders.length }}</p> <!-- Mock data for now -->
+          <p>{{ successfulOrdersCount }}</p>
         </div>
       </div>
     </div>
@@ -71,13 +71,13 @@
           </thead>
           <tbody>
             <tr *ngFor="let order of orders">
-              <td><span class="mono">{{ order.id | slice:0:8 }}...</span></td>
+              <td><span class="mono">{{ order.orderId | slice:0:8 }}...</span></td>
               <td class="amount">{{ order.amount | number:'1.2-2' }}</td>
               <td>{{ order.currency }}</td>
               <td><span class="badge" [ngClass]="order.status.toLowerCase()">{{ order.status }}</span></td>
               <td>{{ order.createdAt | date:'short' }}</td>
               <td>
-                <a [routerLink]="['/order-details', order.id]" class="action-link">View</a>
+                <a [routerLink]="['/order-details', order.orderId]" class="action-link">View</a>
               </td>
             </tr>
           </tbody>

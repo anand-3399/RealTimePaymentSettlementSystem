@@ -41,4 +41,10 @@ export class DashboardComponent implements OnInit {
   logout(): void {
     this.authService.logout();
   }
+
+  get successfulOrdersCount(): number {
+    return this.orders.filter(o => 
+      o.status === 'COMPLETED' || o.status === 'SUCCESS' || o.status === 'PROCESSED'
+    ).length;
+  }
 }

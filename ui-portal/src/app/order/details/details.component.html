@@ -23,7 +23,7 @@
 
         <div class="detail-row">
           <span class="label">Order ID</span>
-          <span class="value mono">{{ order.id }}</span>
+          <span class="value mono">{{ order.orderId }}</span>
         </div>
 
         <div class="detail-row">
@@ -32,13 +32,18 @@
         </div>
 
         <div class="detail-row">
-          <span class="label">Recipient Account</span>
-          <span class="value">{{ order.accountTo }}</span>
+          <span class="label">Sender Account</span>
+          <span class="value">{{ order.senderAccount }}</span>
         </div>
 
-        <div class="detail-row" *ngIf="order.reference">
-          <span class="label">Reference</span>
-          <span class="value">{{ order.reference }}</span>
+        <div class="detail-row">
+          <span class="label">Recipient Account</span>
+          <span class="value">{{ order.recipientAccount }}</span>
+        </div>
+
+        <div class="detail-row" *ngIf="order.description">
+          <span class="label">Description</span>
+          <span class="value">{{ order.description }}</span>
         </div>
 
         <div class="detail-row">
@@ -50,6 +55,31 @@
           <span class="label">Last Updated</span>
           <span class="value">{{ order.updatedAt | date:'medium' }}</span>
         </div>
+
+        <ng-container *ngIf="order.payment">
+          <h3 style="margin-top: 20px; font-size: 1.2rem; color: var(--accent-primary); border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">Payment Execution Details</h3>
+          
+          <div class="detail-row">
+            <span class="label">Payment ID</span>
+            <span class="value mono">{{ order.payment.paymentId }}</span>
+          </div>
+
+          <div class="detail-row">
+            <span class="label">Gateway Txn ID</span>
+            <span class="value mono">{{ order.payment.gatewayTransactionId }}</span>
+          </div>
+
+          <div class="detail-row">
+            <span class="label">Processed At</span>
+            <span class="value">{{ order.payment.processedAt | date:'medium' }}</span>
+          </div>
+
+          <div class="detail-row" *ngIf="order.payment.reason">
+            <span class="label">Reason</span>
+            <span class="value">{{ order.payment.reason }}</span>
+          </div>
+        </ng-container>
+
       </div>
     </div>
   </div>

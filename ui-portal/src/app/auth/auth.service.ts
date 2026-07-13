@@ -41,6 +41,23 @@ export class AuthService {
     return localStorage.getItem(this.tokenKey);
   }
 
+  getRefreshToken(): string | null {
+    return localStorage.getItem(this.refreshTokenKey);
+  }
+
+  refreshTokenApi(refreshToken: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/refreshtoken`, { refreshToken }).pipe(
+      tap((res: any) => {
+        if (res && res.token) {
+          localStorage.setItem(this.tokenKey, res.token);
+          if (res.refreshToken) {
+            localStorage.setItem(this.refreshTokenKey, res.refreshToken);
+          }
+        }
+      })
+    );
+  }
+
   getUsername(): string | null {
     return localStorage.getItem(this.userKey);
   }

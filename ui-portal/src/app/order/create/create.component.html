@@ -31,6 +31,7 @@
           <div class="form-group flex-1">
             <label class="form-label" for="currency">Currency</label>
             <select id="currency" name="currency" class="form-input" [(ngModel)]="orderData.currency" required>
+              <option value="INR">INR</option>
               <option value="USD">USD</option>
               <option value="EUR">EUR</option>
               <option value="GBP">GBP</option>
@@ -39,30 +40,30 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="accountTo">Recipient Account (10 digits)</label>
+          <label class="form-label" for="recipientBankAccount">Recipient Account (8-18 digits)</label>
           <div class="input-wrapper">
             <iconify-icon icon="lucide:credit-card" class="input-icon"></iconify-icon>
             <input 
               type="text" 
-              id="accountTo" 
+              id="recipientBankAccount" 
               class="form-input" 
-              name="accountTo" 
-              [(ngModel)]="orderData.accountTo" 
+              name="recipientBankAccount" 
+              [(ngModel)]="orderData.recipientBankAccount" 
               placeholder="Destination Account"
-              required pattern="^[0-9]{10}$">
+              required pattern="^[0-9]{8,18}$">
           </div>
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="reference">Reference (Optional)</label>
+          <label class="form-label" for="description">Description (Optional)</label>
           <div class="input-wrapper">
             <iconify-icon icon="lucide:file-text" class="input-icon"></iconify-icon>
             <input 
               type="text" 
-              id="reference" 
+              id="description" 
               class="form-input" 
-              name="reference" 
-              [(ngModel)]="orderData.reference" 
+              name="description" 
+              [(ngModel)]="orderData.description" 
               placeholder="Invoice #1234">
           </div>
         </div>

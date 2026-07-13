@@ -13,7 +13,7 @@ import { OrderService } from '../order.service';
   schemas: [CUSTOM_ELEMENTS_SCHEMA]
 })
 export class CreateComponent {
-  orderData = { amount: null, currency: 'USD', accountTo: '', reference: '' };
+  orderData = { amount: null, currency: 'INR', recipientBankAccount: '', description: '' };
   loading = false;
   errorMessage = '';
 
