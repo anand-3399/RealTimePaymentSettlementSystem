@@ -1,0 +1,55 @@
+<div class="auth-container">
+  <div class="auth-card glass-card">
+    <div class="auth-header">
+      <iconify-icon icon="lucide:shield-check" class="auth-icon"></iconify-icon>
+      <h2>Welcome Back</h2>
+      <p>Secure access to RTPS Network</p>
+    </div>
+
+    <form (ngSubmit)="login()" #loginForm="ngForm" class="auth-form">
+      <div class="form-group">
+        <label class="form-label" for="username">Username</label>
+        <div class="input-wrapper">
+          <iconify-icon icon="lucide:user" class="input-icon"></iconify-icon>
+          <input 
+            type="text" 
+            id="username" 
+            class="form-input" 
+            name="username" 
+            [(ngModel)]="credentials.username" 
+            placeholder="Enter your username"
+            required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="password">Password</label>
+        <div class="input-wrapper">
+          <iconify-icon icon="lucide:lock" class="input-icon"></iconify-icon>
+          <input 
+            type="password" 
+            id="password" 
+            class="form-input" 
+            name="password" 
+            [(ngModel)]="credentials.password" 
+            placeholder="Enter your password"
+            required>
+        </div>
+      </div>
+
+      <div *ngIf="errorMessage" class="error-message">
+        <iconify-icon icon="lucide:alert-circle"></iconify-icon>
+        {{ errorMessage }}
+      </div>
+
+      <button type="submit" class="btn-primary" [disabled]="!loginForm.form.valid || loading">
+        <span *ngIf="!loading">Sign In</span>
+        <span *ngIf="loading" class="spinner"></span>
+      </button>
+      
+      <div class="auth-footer">
+        Don't have an account? <a routerLink="/register">Register here</a>
+      </div>
+    </form>
+  </div>
+</div>

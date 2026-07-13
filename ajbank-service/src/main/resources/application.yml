@@ -1,6 +1,8 @@
 spring:
   application:
     name: ajbank-service
+  profiles:
+    active: local
   datasource:
     url: ${ORACLE_URL}
     username: ${ORACLE_USER}

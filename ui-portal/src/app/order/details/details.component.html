@@ -1,0 +1,56 @@
+<div class="layout">
+  <div class="content flex-center">
+    <div class="auth-card glass-card details-container">
+      <div class="back-link">
+        <a routerLink="/dashboard"><iconify-icon icon="lucide:arrow-left"></iconify-icon> Back to Dashboard</a>
+      </div>
+
+      <div class="loading-state" *ngIf="loading">
+        <span class="spinner"></span>
+      </div>
+
+      <div class="error-message" *ngIf="errorMessage">
+        <iconify-icon icon="lucide:alert-circle"></iconify-icon>
+        {{ errorMessage }}
+      </div>
+
+      <div *ngIf="order && !loading" class="order-details">
+        <div class="details-header">
+          <iconify-icon icon="lucide:receipt" class="header-icon"></iconify-icon>
+          <h2>Order Details</h2>
+          <span class="badge" [ngClass]="order.status.toLowerCase()">{{ order.status }}</span>
+        </div>
+
+        <div class="detail-row">
+          <span class="label">Order ID</span>
+          <span class="value mono">{{ order.id }}</span>
+        </div>
+
+        <div class="detail-row">
+          <span class="label">Amount</span>
+          <span class="value amount">{{ order.amount | number:'1.2-2' }} {{ order.currency }}</span>
+        </div>
+
+        <div class="detail-row">
+          <span class="label">Recipient Account</span>
+          <span class="value">{{ order.accountTo }}</span>
+        </div>
+
+        <div class="detail-row" *ngIf="order.reference">
+          <span class="label">Reference</span>
+          <span class="value">{{ order.reference }}</span>
+        </div>
+
+        <div class="detail-row">
+          <span class="label">Created At</span>
+          <span class="value">{{ order.createdAt | date:'medium' }}</span>
+        </div>
+
+        <div class="detail-row" *ngIf="order.updatedAt">
+          <span class="label">Last Updated</span>
+          <span class="value">{{ order.updatedAt | date:'medium' }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

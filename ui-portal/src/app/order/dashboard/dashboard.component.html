@@ -1,0 +1,88 @@
+<div class="layout">
+  <nav class="sidebar glass-card">
+    <div class="brand">
+      <iconify-icon icon="lucide:activity" class="brand-icon"></iconify-icon>
+      <h2>RTPS</h2>
+    </div>
+    <ul class="nav-links">
+      <li class="active"><a routerLink="/dashboard"><iconify-icon icon="lucide:layout-dashboard"></iconify-icon> Dashboard</a></li>
+      <li><a routerLink="/create-order"><iconify-icon icon="lucide:plus-circle"></iconify-icon> New Order</a></li>
+    </ul>
+    <div class="user-info">
+      <div class="avatar"><iconify-icon icon="lucide:user"></iconify-icon></div>
+      <span class="username">{{ username }}</span>
+      <button class="logout-btn" (click)="logout()" title="Logout"><iconify-icon icon="lucide:log-out"></iconify-icon></button>
+    </div>
+  </nav>
+
+  <main class="content">
+    <div class="header">
+      <h1>Dashboard</h1>
+      <a routerLink="/create-order" class="btn-primary">
+        <iconify-icon icon="lucide:plus"></iconify-icon> Initiate Payment
+      </a>
+    </div>
+
+    <div class="dashboard-stats">
+      <div class="stat-card glass-card">
+        <div class="stat-icon" style="color: var(--accent-primary); background: rgba(59,130,246,0.1)"><iconify-icon icon="lucide:file-text"></iconify-icon></div>
+        <div class="stat-info">
+          <h3>Total Orders</h3>
+          <p>{{ orders.length }}</p>
+        </div>
+      </div>
+      <div class="stat-card glass-card">
+        <div class="stat-icon" style="color: var(--success); background: rgba(16,185,129,0.1)"><iconify-icon icon="lucide:check-circle"></iconify-icon></div>
+        <div class="stat-info">
+          <h3>Success</h3>
+          <p>{{ orders.length }}</p> <!-- Mock data for now -->
+        </div>
+      </div>
+    </div>
+
+    <div class="orders-section glass-card">
+      <div class="section-header">
+        <h2>Recent Orders</h2>
+        <button class="icon-btn" (click)="loadOrders()"><iconify-icon icon="lucide:refresh-cw"></iconify-icon></button>
+      </div>
+
+      <div class="loading-state" *ngIf="loading">
+        <span class="spinner"></span>
+        <p>Loading orders...</p>
+      </div>
+
+      <div class="empty-state" *ngIf="!loading && orders.length === 0">
+        <iconify-icon icon="lucide:inbox" class="empty-icon"></iconify-icon>
+        <p>No payment orders found.</p>
+        <a routerLink="/create-order" class="btn-primary" style="margin-top: 15px">Create First Order</a>
+      </div>
+
+      <div class="table-responsive" *ngIf="!loading && orders.length > 0">
+        <table class="orders-table">
+          <thead>
+            <tr>
+              <th>Order ID</th>
+              <th>Amount</th>
+              <th>Currency</th>
+              <th>Status</th>
+              <th>Created At</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let order of orders">
+              <td><span class="mono">{{ order.id | slice:0:8 }}...</span></td>
+              <td class="amount">{{ order.amount | number:'1.2-2' }}</td>
+              <td>{{ order.currency }}</td>
+              <td><span class="badge" [ngClass]="order.status.toLowerCase()">{{ order.status }}</span></td>
+              <td>{{ order.createdAt | date:'short' }}</td>
+              <td>
+                <a [routerLink]="['/order-details', order.id]" class="action-link">View</a>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>

@@ -1,0 +1,82 @@
+<div class="layout">
+  <div class="content flex-center">
+    <div class="auth-card glass-card form-container">
+      <div class="auth-header">
+        <div class="back-link">
+          <a routerLink="/dashboard"><iconify-icon icon="lucide:arrow-left"></iconify-icon> Back to Dashboard</a>
+        </div>
+        <iconify-icon icon="lucide:send" class="auth-icon"></iconify-icon>
+        <h2>Send Payment</h2>
+        <p>Initiate a new real-time settlement</p>
+      </div>
+
+      <form (ngSubmit)="createOrder()" #createForm="ngForm" class="auth-form">
+        <div class="form-row">
+          <div class="form-group flex-2">
+            <label class="form-label" for="amount">Amount</label>
+            <div class="input-wrapper">
+              <iconify-icon icon="lucide:dollar-sign" class="input-icon"></iconify-icon>
+              <input 
+                type="number" 
+                id="amount" 
+                class="form-input" 
+                name="amount" 
+                [(ngModel)]="orderData.amount" 
+                placeholder="0.00"
+                min="0.01" step="0.01"
+                required>
+            </div>
+          </div>
+
+          <div class="form-group flex-1">
+            <label class="form-label" for="currency">Currency</label>
+            <select id="currency" name="currency" class="form-input" [(ngModel)]="orderData.currency" required>
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+              <option value="GBP">GBP</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="accountTo">Recipient Account (10 digits)</label>
+          <div class="input-wrapper">
+            <iconify-icon icon="lucide:credit-card" class="input-icon"></iconify-icon>
+            <input 
+              type="text" 
+              id="accountTo" 
+              class="form-input" 
+              name="accountTo" 
+              [(ngModel)]="orderData.accountTo" 
+              placeholder="Destination Account"
+              required pattern="^[0-9]{10}$">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="reference">Reference (Optional)</label>
+          <div class="input-wrapper">
+            <iconify-icon icon="lucide:file-text" class="input-icon"></iconify-icon>
+            <input 
+              type="text" 
+              id="reference" 
+              class="form-input" 
+              name="reference" 
+              [(ngModel)]="orderData.reference" 
+              placeholder="Invoice #1234">
+          </div>
+        </div>
+
+        <div *ngIf="errorMessage" class="error-message">
+          <iconify-icon icon="lucide:alert-circle"></iconify-icon>
+          {{ errorMessage }}
+        </div>
+
+        <button type="submit" class="btn-primary" [disabled]="!createForm.form.valid || loading" style="margin-top: 15px">
+          <span *ngIf="!loading">Submit Order</span>
+          <span *ngIf="loading" class="spinner"></span>
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
