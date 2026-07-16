@@ -2,6 +2,7 @@ package com.rtps.processor.client;
 
 import com.rtps.processor.dto.AJBankRequest;
 import com.rtps.processor.dto.AJBankResponse;
+import com.rtps.processor.dto.AccountBalance;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import org.slf4j.Logger;
@@ -17,6 +18,7 @@ import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
+import java.util.Optional;
 
 @Component
 public class AJBankClient {
@@ -38,6 +40,22 @@ public class AJBankClient {
                 .build();
         this.ajBankUrl = ajBankUrl;
         this.internalSecret = internalSecret;
+    }
+
+    public Optional<AccountBalance> getAccountBalance(String accountNumber) {
+        String url = ajBankUrl + "/api/accounts/" + accountNumber + "/balance";
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-Internal-Secret", internalSecret);
+        
+        try {
+            ResponseEntity<AccountBalance> response = restTemplate.exchange(
+                url, org.springframework.http.HttpMethod.GET, new HttpEntity<>(headers), AccountBalance.class
+            );
+            return Optional.ofNullable(response.getBody());
+        } catch (Exception e) {
+            logger.warn("Failed to fetch balance for account {}: {}", accountNumber, e.getMessage());
+            return Optional.empty();
+        }
     }
 
     @Retry(name = "ajbank")
@@ -77,16 +95,20 @@ public class AJBankClient {
                         e.getStatusCode(), request.getCorrelationId(), errorResponse.getMessage());
                 return errorResponse;
             } catch (Exception parseException) {
-                // Not a structured response, let Resilience4j handle it as a failure
-                throw e;
+                logger.error("Failed to parse error response from AJBank: {}", e.getResponseBodyAsString());
+                throw e; // rethrow to trigger circuit breaker/retry for unknown errors
             }
         }
     }
+
+    // Fallback method when Circuit Breaker is OPEN or Retries are exhausted
     public AJBankResponse fallbackTransfer(AJBankRequest request, Throwable t) {
-        logger.error("AJBank fallback triggered for order {} | Error: {}", request.getIdempotencyKey(), t.getMessage());
+        logger.error("AJBank Circuit Breaker OPEN or Retries Exhausted | correlationId: {} | error: {}", 
+                request.getCorrelationId(), t.getMessage());
+        
         return AJBankResponse.builder()
                 .status("PENDING_RETRY")
-                .message("AJBank is currently unavailable. Payment will be retried.")
+                .message("AJBank is currently unavailable. Payment is queued for background retry.")
                 .retryReason("BANK_UNAVAILABLE")
                 .correlationId(request.getCorrelationId())
                 .build();

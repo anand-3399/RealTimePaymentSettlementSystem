@@ -42,7 +42,7 @@ public class Payment {
     @Enumerated(EnumType.STRING)
     private PaymentStatus status;
 
-    private String gatewayTransactionId;
+    private String bankReferenceId;
 
     @Column(length = 2000)
     private String gatewayResponse;

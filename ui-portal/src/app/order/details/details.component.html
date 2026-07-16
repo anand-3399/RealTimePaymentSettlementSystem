@@ -60,13 +60,13 @@
           <h3 style="margin-top: 20px; font-size: 1.2rem; color: var(--accent-primary); border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">Payment Execution Details</h3>
           
           <div class="detail-row">
-            <span class="label">Payment ID</span>
-            <span class="value mono">{{ order.payment.paymentId }}</span>
+            <span class="label">Payment Gateway ID</span>
+            <span class="value mono">{{ order.payment.paymentGatewayId }}</span>
           </div>
 
           <div class="detail-row">
-            <span class="label">Gateway Txn ID</span>
-            <span class="value mono">{{ order.payment.gatewayTransactionId }}</span>
+            <span class="label">Bank Reference ID</span>
+            <span class="value mono">{{ order.payment.bankReferenceId }}</span>
           </div>
 
           <div class="detail-row">

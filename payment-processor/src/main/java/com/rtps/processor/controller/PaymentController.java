@@ -19,9 +19,9 @@ public class PaymentController {
     @Autowired
     private PaymentService paymentService;
 
-    @GetMapping("/{paymentId}")
-    public ResponseEntity<PaymentResponse> getPayment(@PathVariable UUID paymentId) {
-        return ResponseEntity.ok(paymentService.getPaymentDetails(paymentId));
+    @GetMapping("/{paymentGatewayId}")
+    public ResponseEntity<PaymentResponse> getPayment(@PathVariable UUID paymentGatewayId) {
+        return ResponseEntity.ok(paymentService.getPaymentDetails(paymentGatewayId));
     }
 
     @GetMapping
@@ -31,9 +31,9 @@ public class PaymentController {
         return ResponseEntity.ok(paymentService.listPayments(orderId, status));
     }
 
-    @PostMapping("/{paymentId}/retry")
-    public ResponseEntity<PaymentResponse> retryPayment(@PathVariable UUID paymentId) {
-        return ResponseEntity.ok(paymentService.retryPayment(paymentId));
+    @PostMapping("/{paymentGatewayId}/retry")
+    public ResponseEntity<PaymentResponse> retryPayment(@PathVariable UUID paymentGatewayId) {
+        return ResponseEntity.ok(paymentService.retryPayment(paymentGatewayId));
     }
 
     @GetMapping("/analytics/daily")

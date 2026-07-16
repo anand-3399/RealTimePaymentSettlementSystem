@@ -119,3 +119,5 @@ temp/
 *.swp
 *.swo
 .rtps_context.md
+start-dev.ps1
+stop-dev.ps1

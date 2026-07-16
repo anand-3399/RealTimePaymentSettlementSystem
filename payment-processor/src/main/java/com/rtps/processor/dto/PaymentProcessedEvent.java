@@ -13,12 +13,12 @@ import java.util.UUID;
 @AllArgsConstructor
 @NoArgsConstructor
 public class PaymentProcessedEvent {
-    private UUID paymentId;
+    private UUID paymentGatewayId;
     private UUID orderId;
     private String userId;
     private BigDecimal amount;
     private String status;
-    private String gatewayTransactionId;
+    private String bankReferenceId;
     private String correlationId;
     private String message;
     private LocalDateTime timestamp;

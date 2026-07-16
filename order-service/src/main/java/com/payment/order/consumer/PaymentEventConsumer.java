@@ -35,8 +35,8 @@ public class PaymentEventConsumer {
                         order.setStatus(Order.OrderStatus.FAILED);
                     }
                     
-                    order.setPaymentId(event.getPaymentId());
-                    order.setGatewayTransactionId(event.getGatewayTransactionId());
+                    order.setPaymentGatewayId(event.getPaymentGatewayId());
+                    order.setBankReferenceId(event.getBankReferenceId());
                     order.setProcessedAt(event.getTimestamp());
                     order.setReason(event.getMessage());
                     

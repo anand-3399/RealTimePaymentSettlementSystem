@@ -133,7 +133,7 @@ public class OrderService {
 
         // If payment details are missing locally, attempt to fetch them from the
         // Payment Processor
-        if (order.getPaymentId() == null) {
+        if (order.getPaymentGatewayId() == null) {
             Optional<PaymentStatusResponse> paymentOpt = paymentProcessorClient
                     .getPaymentStatusByOrderId(orderId);
 
@@ -148,8 +148,8 @@ public class OrderService {
                     order.setStatus(Order.OrderStatus.FAILED);
                 }
 
-                order.setPaymentId(payment.getPaymentId());
-                order.setGatewayTransactionId(payment.getGatewayTransactionId());
+                order.setPaymentGatewayId(payment.getPaymentGatewayId());
+                order.setBankReferenceId(payment.getBankReferenceId());
                 order.setProcessedAt(payment.getProcessedAt());
                 order.setReason(payment.getMessage());
                 orderRepository.save(order);
@@ -183,10 +183,10 @@ public class OrderService {
                 .createdAt(order.getCreatedAt())
                 .build();
 
-        if (order.getPaymentId() != null) {
+        if (order.getPaymentGatewayId() != null) {
             response.setPayment(OrderResponse.PaymentInfo.builder()
-                    .paymentId(order.getPaymentId())
-                    .gatewayTransactionId(order.getGatewayTransactionId())
+                    .paymentGatewayId(order.getPaymentGatewayId())
+                    .bankReferenceId(order.getBankReferenceId())
                     .processedAt(order.getProcessedAt())
                     .reason(order.getReason())
                     .build());

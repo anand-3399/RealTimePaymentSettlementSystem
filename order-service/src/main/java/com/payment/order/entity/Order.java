@@ -47,8 +47,8 @@ public class Order {
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
-    private UUID paymentId;
-    private String gatewayTransactionId;
+    private UUID paymentGatewayId;
+    private String bankReferenceId;
     private LocalDateTime processedAt;
     
     @Column(length = 2000, name = "reason")

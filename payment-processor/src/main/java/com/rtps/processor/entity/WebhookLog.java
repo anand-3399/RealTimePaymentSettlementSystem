@@ -18,7 +18,7 @@ public class WebhookLog {
     @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;
 
-    private UUID paymentId;
+    private UUID paymentGatewayId;
 
     private String eventType;
     

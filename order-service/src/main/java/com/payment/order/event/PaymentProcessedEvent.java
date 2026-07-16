@@ -15,12 +15,12 @@ import java.util.UUID;
 @NoArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class PaymentProcessedEvent {
-    private UUID paymentId;
+    private UUID paymentGatewayId;
     private UUID orderId;
     private String userId;
     private BigDecimal amount;
     private String status;
-    private String gatewayTransactionId;
+    private String bankReferenceId;
     private LocalDateTime timestamp;
     private String correlationId;
     private String message;

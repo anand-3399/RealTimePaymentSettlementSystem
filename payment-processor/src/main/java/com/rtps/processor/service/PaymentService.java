@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rtps.processor.client.AJBankClient;
 import com.rtps.processor.dto.AJBankRequest;
 import com.rtps.processor.dto.AJBankResponse;
+import com.rtps.processor.dto.AccountBalance;
 import com.rtps.processor.dto.AnalyticsResponse;
 import com.rtps.processor.dto.OrderCreatedEvent;
 import com.rtps.processor.dto.PaymentProcessedEvent;
@@ -82,7 +83,42 @@ public class PaymentService {
 
         payment = paymentRepository.save(payment);
 
-        // 3. Bank Handshake
+        // 3. GATEWAY VALIDATION: Check balance BEFORE calling bank
+        Optional<AccountBalance> balanceOpt = ajBankClient.getAccountBalance(senderAccount);
+        
+        if (balanceOpt.isEmpty()) {
+            // Infrastructure failure
+            payment.setStatus(Payment.PaymentStatus.PENDING_RETRY);
+            payment.setRetryReason(RetryReason.BANK_UNAVAILABLE);
+            payment.setNextRetryAt(LocalDateTime.now().plusSeconds(2));
+            paymentRepository.save(payment);
+            return;
+        }
+
+        AccountBalance balance = balanceOpt.get();
+
+        // Check 1: Sufficient balance?
+        if (balance.getBalance().compareTo(amount) < 0) {
+            payment.setStatus(Payment.PaymentStatus.FAILED);
+            payment.setRetryReason(RetryReason.INSUFFICIENT_BALANCE);
+            payment.setGatewayResponse("Insufficient balance. Required: " + amount 
+                                     + " | Available: " + balance.getBalance());
+            paymentRepository.save(payment);
+            publishProcessedEvent(payment);
+            return;
+        }
+
+        // Check 2: Account status?
+        if (!"ACTIVE".equals(balance.getStatus())) {
+            payment.setStatus(Payment.PaymentStatus.FAILED);
+            payment.setRetryReason(RetryReason.ACCOUNT_FROZEN);
+            payment.setGatewayResponse("Account is " + balance.getStatus());
+            paymentRepository.save(payment);
+            publishProcessedEvent(payment);
+            return;
+        }
+
+        // 4. Bank Handshake (All checks passed)
         executeHandshake(payment);
     }
 
@@ -230,7 +266,7 @@ public class PaymentService {
                     String oldStatus = payment.getStatus().name();
                     if ("COMPLETED".equals(ajResponse.getStatus())) {
                         payment.setStatus(Payment.PaymentStatus.COMPLETED);
-                        payment.setGatewayTransactionId(ajResponse.getTransactionId().toString());
+                        payment.setBankReferenceId(ajResponse.getTransactionId().toString());
                     } else if ("FAILED".equals(ajResponse.getStatus())) {
                         payment.setStatus(Payment.PaymentStatus.FAILED);
                     }
@@ -261,9 +297,9 @@ public class PaymentService {
         }
     }
 
-    public PaymentResponse getPaymentDetails(UUID paymentId) {
-        Payment payment = paymentRepository.findById(paymentId)
-                .orElseThrow(() -> new RuntimeException("Payment not found: " + paymentId));
+    public PaymentResponse getPaymentDetails(UUID paymentGatewayId) {
+        Payment payment = paymentRepository.findById(paymentGatewayId)
+                .orElseThrow(() -> new RuntimeException("Payment not found: " + paymentGatewayId));
         return mapToResponse(payment);
     }
 
@@ -281,8 +317,8 @@ public class PaymentService {
     }
 
     @Transactional
-    public PaymentResponse retryPayment(UUID paymentId) {
-        Payment payment = paymentRepository.findById(paymentId)
+    public PaymentResponse retryPayment(UUID paymentGatewayId) {
+        Payment payment = paymentRepository.findById(paymentGatewayId)
                 .orElseThrow(() -> new RuntimeException("Payment not found"));
         
         if (payment.getStatus() == Payment.PaymentStatus.COMPLETED) {
@@ -330,12 +366,12 @@ public class PaymentService {
 
     private void publishProcessedEvent(Payment payment) {
         PaymentProcessedEvent event = PaymentProcessedEvent.builder()
-                .paymentId(payment.getId())
+                .paymentGatewayId(payment.getId())
                 .orderId(payment.getOrderId())
                 .userId(payment.getUserId())
                 .amount(payment.getAmount())
                 .status(payment.getStatus().name())
-                .gatewayTransactionId(payment.getGatewayTransactionId())
+                .bankReferenceId(payment.getBankReferenceId())
                 .correlationId(payment.getCorrelationId())
                 .message(payment.getGatewayResponse())
                 .timestamp(LocalDateTime.now())
@@ -345,7 +381,7 @@ public class PaymentService {
 
     private PaymentResponse mapToResponse(Payment payment) {
         return PaymentResponse.builder()
-                .paymentId(payment.getId())
+                .paymentGatewayId(payment.getId())
                 .orderId(payment.getOrderId())
                 .userId(payment.getUserId())
                 .senderAccount(maskAccount(payment.getSenderAccount()))
@@ -353,7 +389,7 @@ public class PaymentService {
                 .amount(payment.getAmount())
                 .currency(payment.getCurrency())
                 .status(payment.getStatus().name())
-                .gatewayTransactionId(payment.getGatewayTransactionId())
+                .bankReferenceId(payment.getBankReferenceId())
                 .processedAt(payment.getProcessedAt())
                 .createdAt(payment.getCreatedAt())
                 .correlationId(payment.getCorrelationId())

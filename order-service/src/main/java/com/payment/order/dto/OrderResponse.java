@@ -27,8 +27,8 @@ public class OrderResponse {
     @AllArgsConstructor
     @NoArgsConstructor
     public static class PaymentInfo {
-        private UUID paymentId;
-        private String gatewayTransactionId;
+        private UUID paymentGatewayId;
+        private String bankReferenceId;
         private LocalDateTime processedAt;
         private String reason;
     }

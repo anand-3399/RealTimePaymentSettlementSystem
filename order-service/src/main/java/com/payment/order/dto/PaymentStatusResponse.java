@@ -13,10 +13,10 @@ import java.util.UUID;
 @AllArgsConstructor
 @NoArgsConstructor
 public class PaymentStatusResponse {
-    private UUID paymentId;
+    private UUID paymentGatewayId;
     private UUID orderId;
     private String status;
-    private String gatewayTransactionId;
+    private String bankReferenceId;
     private LocalDateTime processedAt;
     private String correlationId;
     private String message;

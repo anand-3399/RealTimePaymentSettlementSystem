@@ -19,7 +19,7 @@ public class PaymentTransactionLog {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "payment_id", nullable = false)
+    @JoinColumn(name = "payment_gateway_id", nullable = false)
     private Payment payment;
 
     @Column(nullable = false)

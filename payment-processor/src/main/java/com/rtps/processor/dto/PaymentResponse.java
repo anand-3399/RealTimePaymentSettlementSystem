@@ -13,7 +13,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @NoArgsConstructor
 public class PaymentResponse {
-    private UUID paymentId;
+    private UUID paymentGatewayId;
     private UUID orderId;
     private String userId;
     private String senderAccount;
@@ -21,7 +21,7 @@ public class PaymentResponse {
     private BigDecimal amount;
     private String currency;
     private String status;
-    private String gatewayTransactionId;
+    private String bankReferenceId;
     private LocalDateTime processedAt;
     private LocalDateTime createdAt;
     private String correlationId;
