@@ -5,8 +5,8 @@ RTPS is a high-performance, production-grade microservices ecosystem designed fo
 
 ## Architecture
 - **Order Service (Port 8081)**: Entry point for creating payment orders. Implements JWT auth, idempotency, and the Transactional Outbox pattern.
-- **Payment Processor (Port 8082)**: Orchestrates payment execution with external banks (AJBank).
-- **AJBank Service (Port 8083)**:
+- **Payment Processor (Port 8082)**: Orchestrates payment execution with external banks (Bank1).
+- **Bank1 Service (Port 8083)**:
     - **Core Banking**: ACID-compliant internal transfers with pessimistic locking.
     - **Permanent Idempotency**: Lifetime deduplication of requests from the Order Service.
     - **Security**: Protected via `X-Internal-Secret` header.
@@ -26,5 +26,5 @@ RTPS is a high-performance, production-grade microservices ecosystem designed fo
 ## 🚀 Deployment (Local)
 1. Ensure **Kafka** and **Oracle DB** are running.
 2. Set `spring.profiles.active=local` for both services.
-3. Run `OrderServiceApplication` and `PaymentProcessorApplication`.
+3. Run `OrderServiceApplication` and `PaymentGatewayApplication`.
 4. Access UI at `http://localhost:8000`.

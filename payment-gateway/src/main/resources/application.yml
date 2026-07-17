@@ -1,0 +1,88 @@
+spring:
+  application:
+    name: payment-gateway
+  profiles:
+    active: local
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+  datasource:
+    url: ${ORACLE_URL}
+    username: ${ORACLE_USER}
+    password: ${ORACLE_PASSWORD}
+    driver-class-name: oracle.jdbc.OracleDriver
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 100
+      idle-timeout: 30000
+      max-lifetime: 1800000
+      connection-timeout: 30000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        hikari:
+          minimumIdle: 5
+          maximumPoolSize: 100
+
+  kafka:
+    bootstrap-servers: ${KAFKA_SERVERS}
+    consumer:
+      group-id: payment-gateway-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.trusted.packages: "*"
+        spring.json.type.mapping: "com.payment.order.event.OrderCreatedEvent:com.rtps.gateway.dto.OrderCreatedEvent"
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    properties:
+      spring.json.add.type.headers: true
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+
+resilience4j:
+  retry:
+    instances:
+      bank1:
+        maxAttempts: 3
+        waitDuration: 2000
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        retryExceptions:
+          - org.springframework.web.client.HttpServerErrorException
+          - org.springframework.web.client.ResourceAccessException
+  circuitbreaker:
+    instances:
+      bank1:
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 60000
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+
+server:
+  port: 8082
+
+bank1:
+  api:
+    url: ${BANK1_API_URL}
+    key: ${BANK1_API_KEY}
+
+rtps:
+  bank1:
+    url: ${BANK1_URL:http://localhost:8083}
+    secret: ${PROCESSOR_TO_BANK1_SECRET}
+  inbound-secret: ${ORDER_TO_PROCESSOR_SECRET}
+  encryption:
+    key: ${ENCRYPTION_KEY}

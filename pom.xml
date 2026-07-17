@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.2.4</version>
+        <version>3.5.16</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.rtps</groupId>
@@ -16,8 +16,9 @@
     <description>Real-Time Payment Settlement System</description>
 
     <modules>
+        <module>bank1-service</module>
         <module>order-service</module>
-        <module>payment-processor</module>
+        <module>payment-gateway</module>
         <module>settlement-worker</module>
     </modules>
 

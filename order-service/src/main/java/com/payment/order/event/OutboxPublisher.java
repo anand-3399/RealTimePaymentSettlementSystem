@@ -1,22 +1,22 @@
 package com.payment.order.event;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.payment.order.entity.OutboxEvent;
-import com.payment.order.repository.OutboxEventRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.time.LocalDateTime;
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.util.List;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.payment.order.entity.OutboxEvent;
+import com.payment.order.repository.OutboxEventRepository;
+
+import lombok.extern.slf4j.Slf4j;
 
 @Component
+@Slf4j
 public class OutboxPublisher {
-
-    private static final Logger logger = LoggerFactory.getLogger(OutboxPublisher.class);
     private static final int MAX_RETRIES = 5;
 
     @Autowired
@@ -28,7 +28,7 @@ public class OutboxPublisher {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @Scheduled(fixedDelay = 10000) // Poll every 10 seconds
+    @Scheduled(fixedDelayString = "#{@configService.getConfigAsString('ORDER_OUTBOX_POLL_DELAY')}")
     @Transactional
     public void publishPendingEvents() {
         List<OutboxEvent> pendingEvents = outboxEventRepository.findReadyToPublish(MAX_RETRIES);
@@ -37,7 +37,7 @@ public class OutboxPublisher {
             return;
         }
 
-        logger.info("OutboxPublisher: Found {} pending events", pendingEvents.size());
+        log.info("OutboxPublisher: Found {} pending events", pendingEvents.size());
 
         for (OutboxEvent event : pendingEvents) {
             try {
@@ -50,7 +50,7 @@ public class OutboxPublisher {
                     event.setStatus(OutboxEvent.OutboxStatus.PUBLISHED);
                     event.setPublishedAt(LocalDateTime.now());
                 } else {
-                    logger.warn("Unknown event type in outbox: {}", event.getEventType());
+                    log.warn("Unknown event type in outbox: {}", event.getEventType());
                     event.setStatus(OutboxEvent.OutboxStatus.FAILED);
                 }
             } catch (Exception e) {
@@ -60,7 +60,7 @@ public class OutboxPublisher {
                 long delayMs = Math.min(300000, (long) Math.pow(2, event.getRetryCount() - 1) * 1000);
                 event.setNextRetryAt(LocalDateTime.now().plusNanos(delayMs * 1_000_000));
 
-                logger.error("Failed to publish outbox event {}. Retry count: {} | Next retry in {}ms | Error: {}", 
+                log.error("Failed to publish outbox event {}. Retry count: {} | Next retry in {}ms | Error: {}", 
                         event.getId(), event.getRetryCount(), delayMs, e.getMessage());
                 
                 if (event.getRetryCount() >= MAX_RETRIES) {
@@ -71,3 +71,4 @@ public class OutboxPublisher {
         }
     }
 }
+

@@ -4,28 +4,28 @@ spring:
   profiles:
     active: local
 
-logging:
-  file:
-    name: logs/order-service.log
-  level:
-    com.payment.order: DEBUG
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%X{correlationId}] %-5level %logger{36} - %msg%n"
-    file: "%d{yyyy-MM-dd HH:mm:ss} [%X{correlationId}] %-5level %logger{36} - %msg%n"
 
   datasource:
     url: ${ORACLE_URL}
     username: ${ORACLE_USER}
     password: ${ORACLE_PASSWORD}
     driver-class-name: oracle.jdbc.OracleDriver
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 100
+      idle-timeout: 30000
+      max-lifetime: 1800000
+      connection-timeout: 30000
 
   jpa:
     hibernate:
       ddl-auto: validate
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.OracleDialect
+        hikari:
+          minimumIdle: 5
+          maximumPoolSize: 100
 
   kafka:
     bootstrap-servers: ${KAFKA_SERVERS}
@@ -49,7 +49,7 @@ rtps:
   jwtSecret: ${JWT_SECRET}
   jwtExpirationMs: 1800000 # 30 minutes
   refreshExpirationMs: 604800000 # 7 days
-  payment-processor:
+  payment-gateway:
     url: ${PAYMENT_PROCESSOR_URL}
     path: ${PAYMENT_PROCESSOR_PATH}
     secret: ${ORDER_TO_PROCESSOR_SECRET}
@@ -81,9 +81,9 @@ resilience4j:
   ratelimiter:
     configs:
       default:
-        limitRefreshPeriod: 1m
-        limitForPeriod: 3
-        timeoutDuration: 0s
+        limitRefreshPeriod: ${RATELIMITER_REFRESH_PERIOD}
+        limitForPeriod: ${RATELIMITER_LIMIT_PERIOD}
+        timeoutDuration: ${RATELIMITER_TIMEOUT}
     instances:
       orderService:
         baseConfig: default

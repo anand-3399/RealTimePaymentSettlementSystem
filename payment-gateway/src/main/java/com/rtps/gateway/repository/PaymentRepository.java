@@ -1,0 +1,23 @@
+package com.rtps.gateway.repository;
+
+import com.rtps.gateway.entity.Payment;
+import com.rtps.gateway.entity.Payment.PaymentStatus;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+public interface PaymentRepository extends JpaRepository<Payment, UUID> {
+    Optional<Payment> findByOrderId(UUID orderId);
+    List<Payment> findByStatus(Payment.PaymentStatus status);
+    Optional<Payment> findByBankReferenceId(String bankReferenceId);
+    Optional<Payment> findTopByCorrelationIdOrderByCreatedAtDesc(String correlationId);
+	List<Payment> findByStatusIn(List<PaymentStatus> statuses);
+
+    @Query("SELECT p FROM Payment p WHERE p.status IN :statuses AND (p.nextRetryAt IS NULL OR p.nextRetryAt <= :now)")
+    List<Payment> findPaymentsDueForRetry(List<PaymentStatus> statuses, LocalDateTime now);
+}

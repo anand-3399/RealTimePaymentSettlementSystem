@@ -1,0 +1,38 @@
+spring:
+  application:
+    name: bank1-service
+  profiles:
+    active: local
+  datasource:
+    url: ${ORACLE_URL}
+    username: ${ORACLE_USER}
+    password: ${ORACLE_PASSWORD}
+    driver-class-name: oracle.jdbc.OracleDriver
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 100
+      idle-timeout: 30000
+      max-lifetime: 1800000
+      connection-timeout: 30000
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        hikari:
+          minimumIdle: 5
+          maximumPoolSize: 100
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+
+server:
+  port: 8083
+
+rtps:
+  inbound-secret: ${PROCESSOR_TO_BANK1_SECRET}
+  bank1:
+    webhook:
+      url: ${RTPS_BANK1_WEBHOOK_URL}
+      secret: ${RTPS_BANK1_WEBHOOK_SECRET}

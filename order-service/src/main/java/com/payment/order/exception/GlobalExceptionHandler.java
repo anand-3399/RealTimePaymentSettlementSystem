@@ -1,16 +1,20 @@
 package com.payment.order.exception;
 
-import com.payment.order.dto.ErrorResponse;
-import io.github.resilience4j.ratelimiter.RequestNotPermitted;
+import java.time.LocalDateTime;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
-import java.time.LocalDateTime;
+import com.payment.order.dto.ErrorResponse;
+
+import io.github.resilience4j.ratelimiter.RequestNotPermitted;
+import lombok.extern.slf4j.Slf4j;
 
 @ControllerAdvice
+@Slf4j
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(InvalidOrderException.class)
@@ -58,8 +62,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGlobalException(Exception ex) {
-        org.slf4j.LoggerFactory.getLogger(GlobalExceptionHandler.class)
-            .error("Unexpected error: {}", ex.getMessage(), ex);
+        log.error("Unexpected error: {}", ex.getMessage(), ex);
             
         ErrorResponse error = ErrorResponse.builder()
                 .error("INTERNAL_ERROR")
@@ -69,3 +72,4 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(error, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 }
+

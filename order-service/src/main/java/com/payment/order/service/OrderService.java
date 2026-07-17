@@ -1,7 +1,19 @@
 package com.payment.order.service;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.payment.order.client.PaymentProcessorClient;
+import com.payment.order.client.PaymentGatewayClient;
 import com.payment.order.dto.CreateOrderRequest;
 import com.payment.order.dto.OrderResponse;
 import com.payment.order.dto.PaymentStatusResponse;
@@ -12,24 +24,12 @@ import com.payment.order.event.OrderCreatedEvent;
 import com.payment.order.event.OutboxEventCreated;
 import com.payment.order.repository.OrderRepository;
 import com.payment.order.repository.OutboxEventRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
+@Slf4j
 public class OrderService {
-
-    private static final Logger logger = LoggerFactory.getLogger(OrderService.class);
 
     @Autowired
     private OrderRepository orderRepository;
@@ -52,13 +52,13 @@ public class OrderService {
     @Transactional(rollbackFor = Exception.class)
     public OrderResponse createOrder(CreateOrderRequest request, String userId, String idempotencyKey) {
         String correlationId = MDC.get("correlationId");
-        logger.info("Processing order creation | username: {} | amount: {} | correlationId: {}",
+        log.info("Processing order creation | username: {} | amount: {} | correlationId: {}",
                 userId, request.getAmount(), correlationId);
 
         // 1. Check Idempotency
         Optional<UUID> existingOrderId = idempotencyService.getOrderId(idempotencyKey);
         if (existingOrderId.isPresent()) {
-            logger.warn(
+            log.warn(
                     "Audit: Duplicate order attempt detected - returning cached response | idempotencyKey: {} | correlationId: {}",
                     idempotencyKey, correlationId);
             Order existingOrder = orderRepository.findById(existingOrderId.get())
@@ -112,10 +112,10 @@ public class OrderService {
             // 6. Publish local event for eager outbox publishing
             eventPublisher.publishEvent(new OutboxEventCreated(this));
 
-            logger.info("Order saved and event stored in outbox | orderId: {} | correlationId: {}",
+            log.info("Order saved and event stored in outbox | orderId: {} | correlationId: {}",
                     savedOrder.getOrderId(), correlationId);
         } catch (Exception e) {
-            logger.error("Failed to serialize or save outbox event for order {}: {}", savedOrder.getOrderId(),
+            log.error("Failed to serialize or save outbox event for order {}: {}", savedOrder.getOrderId(),
                     e.getMessage());
             throw new RuntimeException("Failed to prepare outbox event", e);
         }
@@ -124,7 +124,7 @@ public class OrderService {
     }
 
     @Autowired
-    private PaymentProcessorClient paymentProcessorClient;
+    private PaymentGatewayClient paymentProcessorClient;
 
     @Transactional
     public OrderResponse getOrderById(UUID orderId) {
@@ -139,7 +139,7 @@ public class OrderService {
 
             if (paymentOpt.isPresent()) {
                 PaymentStatusResponse payment = paymentOpt.get();
-                logger.info("Real-time update: Payment found for order {}. Status: {}", orderId, payment.getStatus());
+                log.info("Real-time update: Payment found for order {}. Status: {}", orderId, payment.getStatus());
 
                 // Update local status and tracking fields
                 if ("COMPLETED".equalsIgnoreCase(payment.getStatus())) {
@@ -195,3 +195,4 @@ public class OrderService {
         return response;
     }
 }
+

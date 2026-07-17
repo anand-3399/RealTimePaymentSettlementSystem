@@ -28,7 +28,7 @@
         <div class="stat-icon" style="color: var(--accent-primary); background: rgba(59,130,246,0.1)"><iconify-icon icon="lucide:file-text"></iconify-icon></div>
         <div class="stat-info">
           <h3>Total Orders</h3>
-          <p>{{ orders.length }}</p>
+          <p>{{ totalElements }}</p>
         </div>
       </div>
       <div class="stat-card glass-card">
@@ -82,6 +82,29 @@
             </tr>
           </tbody>
         </table>
+        
+        <!-- Pagination Controls -->
+        <div class="pagination-controls" style="display: flex; justify-content: space-between; align-items: center; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); margin-top: 20px;">
+          <div class="pagination-info" style="color: var(--text-secondary); font-size: 0.9rem;">
+            Showing page {{ currentPage + 1 }} of {{ totalPages || 1 }} ({{ totalElements }} total orders)
+          </div>
+          
+          <div class="pagination-go-to" style="display: flex; align-items: center; gap: 8px;">
+            <span style="color: var(--text-secondary); font-size: 0.9rem;">Go to:</span>
+            <input type="number" [(ngModel)]="pageInput" (keyup.enter)="goToPage()" min="1" [max]="totalPages || 1" 
+                   class="form-input" style="width: 60px; padding: 4px 8px; text-align: center; font-size: 0.9rem;">
+            <button class="btn-secondary" (click)="goToPage()" style="padding: 4px 8px; font-size: 0.9rem;">Go</button>
+          </div>
+
+          <div class="pagination-buttons" style="display: flex; gap: 10px;">
+            <button class="btn-secondary" (click)="previousPage()" [disabled]="currentPage === 0" style="padding: 6px 12px; font-size: 0.9rem;">
+              <iconify-icon icon="lucide:chevron-left"></iconify-icon> Previous
+            </button>
+            <button class="btn-secondary" (click)="nextPage()" [disabled]="currentPage >= totalPages - 1" style="padding: 6px 12px; font-size: 0.9rem;">
+              Next <iconify-icon icon="lucide:chevron-right"></iconify-icon>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </main>

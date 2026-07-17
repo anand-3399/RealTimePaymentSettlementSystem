@@ -1,17 +1,16 @@
 package com.payment.order.event;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-@Component
-public class EagerOutboxListener {
+import lombok.extern.slf4j.Slf4j;
 
-    private static final Logger logger = LoggerFactory.getLogger(EagerOutboxListener.class);
+@Component
+@Slf4j
+public class EagerOutboxListener {
 
     @Autowired
     private OutboxPublisher outboxPublisher;
@@ -19,11 +18,12 @@ public class EagerOutboxListener {
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleOutboxEvent(OutboxEventCreated event) {
-        logger.info("EagerOutboxListener: Triggering immediate outbox publication after commit");
+        log.info("EagerOutboxListener: Triggering immediate outbox publication after commit");
         try {
             outboxPublisher.publishPendingEvents();
         } catch (Exception e) {
-            logger.error("EagerOutboxListener: Failed to publish events eagerly: {}", e.getMessage());
+            log.error("EagerOutboxListener: Failed to publish events eagerly: {}", e);
         }
     }
 }
+

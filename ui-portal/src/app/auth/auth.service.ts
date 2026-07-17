@@ -11,6 +11,7 @@ export class AuthService {
   private tokenKey = 'rtps_token';
   private refreshTokenKey = 'rtps_refresh_token';
   private userKey = 'rtps_username';
+  private correlationIdKey = 'rtps_correlation_id';
 
   constructor(private http: HttpClient, private router: Router) { }
 
@@ -25,6 +26,9 @@ export class AuthService {
           localStorage.setItem(this.tokenKey, res.token);
           localStorage.setItem(this.refreshTokenKey, res.refreshToken);
           localStorage.setItem(this.userKey, res.username);
+          if (!localStorage.getItem(this.correlationIdKey)) {
+            localStorage.setItem(this.correlationIdKey, crypto.randomUUID());
+          }
         }
       })
     );
@@ -34,6 +38,7 @@ export class AuthService {
     localStorage.removeItem(this.tokenKey);
     localStorage.removeItem(this.refreshTokenKey);
     localStorage.removeItem(this.userKey);
+    localStorage.removeItem(this.correlationIdKey);
     this.router.navigate(['/login']);
   }
 
@@ -64,5 +69,9 @@ export class AuthService {
 
   isLoggedIn(): boolean {
     return !!this.getToken();
+  }
+
+  getCorrelationId(): string | null {
+    return localStorage.getItem(this.correlationIdKey);
   }
 }

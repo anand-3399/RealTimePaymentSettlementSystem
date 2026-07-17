@@ -44,11 +44,12 @@ public class Order {
     @Enumerated(EnumType.STRING)
     private OrderStatus status;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TIMESTAMP")
     private LocalDateTime createdAt;
 
     private UUID paymentGatewayId;
     private String bankReferenceId;
+    @Column(columnDefinition = "TIMESTAMP")
     private LocalDateTime processedAt;
     
     @Column(length = 2000, name = "reason")

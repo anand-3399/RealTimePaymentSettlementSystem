@@ -4,7 +4,9 @@ import org.springframework.context.ApplicationEvent;
 
 public class OutboxEventCreated extends ApplicationEvent {
     
-    public OutboxEventCreated(Object source) {
+    private static final long serialVersionUID = 1L;
+
+	public OutboxEventCreated(Object source) {
         super(source);
     }
 }

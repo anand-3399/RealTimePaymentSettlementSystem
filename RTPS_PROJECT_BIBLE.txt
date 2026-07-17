@@ -83,11 +83,36 @@ LAYER 6: Background Recovery Scheduler
 - SERVICE-TO-SERVICE: Internal calls use the `X-Internal-Secret` header 
   with rotating secrets loaded from environment variables.
 
-6. DATA INTEGRITY & CONSISTENCY
+6. DATA INTEGRITY & CONSISTENCY (THE DUAL-DB ARCHITECTURE)
 -------------------------------------------------------------------------------
-- PESSIMISTIC LOCKING: AJBank uses `SELECT ... FOR UPDATE` with a 5s timeout. 
-  This prevents "Race Conditions" where two people try to debit the same 
-  account at the same time.
+Previously, the system relied on PESSIMISTIC LOCKING (`SELECT ... FOR UPDATE` with a 5s timeout) on a single database. However, this created thread contention under high concurrency. 
+
+To resolve this, we migrated to a DUAL-DB OPTIMISTIC LOCKING architecture for AJBank:
+- SECURE DB (Source of Truth - `AJBankInternalPvtLtd`): Maintained by core banking DBAs. Contains the authoritative `bank_accounts` table with an `account_version` column. It is treated as heavily guarded and acts as the final ledger.
+- OPERATIONAL DB (Cache - `AJBankPvtLtd`): A high-speed cache database used by our microservices (`bank_accounts_cache`). It maintains its own local balance and a copy of the `account_version` and `sync_status`.
+
+THE LAZY SYNC MECHANISM (Transaction Flow):
+
+Payment Processor calls: POST /api/transfer
+
+AJBank:
+  1. Load sender and recipient from AJBankPvtLtd (operational)
+  2. Check: version_operational == version_secure?
+     ├─ If NO: Stale data detected
+     │  ├─ Fetch fresh from InternalPvtLtd (secure)
+     │  ├─ Update AJBankPvtLtd with new version
+     │  └─ Retry transaction (proceed with fresh data)
+     └─ If YES: Proceed (data is fresh)
+  
+  3. Debit sender: balance -= amount, version++
+  4. Credit recipient: balance += amount, version++
+  5. Save both (atomic transaction)
+  6. Check: Update succeeded?
+     ├─ If version conflict: Return 409 (LOCKED_PENDING_RETRY)
+     └─ If success: Return 200 OK
+
+This flow guarantees 100% data integrity without long-held database locks!
+
 - 3-LAYER IDEMPOTENCY: 
   1. Order Level: Unique UUID for every order.
   2. Processor Level: Idempotency Key mapping in DB.
@@ -109,19 +134,25 @@ REFACTOR DECISION:
 -------------------------------------------------------------------------------
 - CORRELATION ID: `X-Correlation-ID` is generated at the Order Service and 
   propagated through Kafka and Webhooks.
-- MDC LOGGING: Every log line contains the Correlation ID, allowing 
-  developers to trace a single request across all microservices.
-- AUDIT TRAIL: Every webhook arrival is logged in a separate transaction 
-  (`Propagation.REQUIRES_NEW`) ensuring auditability even if the main 
-  transaction fails.
+- LOGGING (Logback): All microservices share a centralized `logback-spring.xml` config.
+  - Format: `%d{yyyy-MM-dd HH:mm:ss.SSS} [%X{correlationId}] [%thread] %-5level %logger{36} - %msg%n`
+  - Rollover: Files rotate dynamically when exceeding 10MB or at midnight (1-day limit) into a `.zip` file stored in a dated folder.
+  - Retention: `maxHistory` caps zipped backups to 5 days.
+- AUDIT TRAIL: 
+  - Every webhook arrival is logged in a separate transaction (`Propagation.REQUIRES_NEW`) ensuring auditability even if the main transaction fails.
+  - A `webhook_logs` table stores the raw payload and signature of every incoming callback to the Payment Processor.
 
 9. DATABASE SCHEMA SUMMARY (FLYWAY)
 -------------------------------------------------------------------------------
 The DB evolved through multiple versions, including:
 - V1-V3: Core entities (Orders, Accounts, Idempotency).
 - V5: Webhook Delivery logging.
+- V6: Dual Database separation (AJBank) and `account_version` addition.
 - V8-V10: Transactional Outbox and Failure Reason tracking.
 - V11: Added detailed "Reason" fields for business failure visibility.
+
+*NOTE ON ORACLE DB PRECISION: 
+Financial fields using `BigDecimal` are mapped strictly to `NUMBER(19,4)` via `@Column(precision = 19, scale = 4)`. Without this explicit scale, Hibernate incorrectly attempts to generate `NUMBER(38,2)`, causing `ORA-01440` validation errors against populated columns.
 
 10. LESSONS LEARNED & BEST PRACTICES
 -------------------------------------------------------------------------------
@@ -130,6 +161,42 @@ The DB evolved through multiple versions, including:
 - Race conditions in distributed systems are inevitable—always implement 
   retry-and-wait logic for inter-service communication.
 - Always log status changes in a separate transaction for high-volume audit.
+
+11. THE PAYMENT GATEWAY BOUNDARY (BUSINESS LOGIC)
+-------------------------------------------------------------------------------
+During architectural review, we defined the strict boundaries of responsibility between the Payment Gateway (`payment-processor`) and the Core Bank (`ajbank-service`).
+- The Payment Processor acts as the first line of defense. It actively queries `getAccountBalance()` from AJBank to pre-validate sufficient funds, account status, and prerequisites *before* attempting a transfer. If validation fails, it short-circuits to `FAILURE` and fires a webhook back to `order-service` without ever invoking the heavy `transferMoney()` engine in AJBank.
+- AJBank acts as the final authoritative ledger, re-verifying the dual-db state at the exact moment of transaction.
+
+12. LOCAL DEV ENVIRONMENT CAPABILITIES
+-------------------------------------------------------------------------------
+- `start-dev.ps1`: Launches all 3 services + Kafka in Windows Terminal tabs. It automatically attaches the JVM Remote Debugger (`-agentlib:jdwp`) on ports 5005 (Order), 5006 (Processor), and 5007 (AJBank) in non-suspend mode.
+- `stop-dev.ps1`: Utilizes forceful termination (`taskkill /F`) for Java and Node processes, bypassing the inability of Windows to gracefully signal console background tasks without physical keyboard interrupts.
+
+13. FRONTEND ARCHITECTURE (ANGULAR MIGRATION - JULY 16)
+-------------------------------------------------------------------------------
+- The legacy UI portal was completely replaced with a modern, high-performance Angular application.
+- ARCHITECTURAL BOUNDARY: The UI couples exclusively with the `order-service`. All authentication (JWT), user session management, and order creation/tracking run strictly through this gateway, isolating the frontend from the downstream settlement engines (`payment-processor`, `ajbank-service`).
+- DESIGN SYSTEM: Employs Vanilla CSS for premium, high-fidelity styling without heavy framework bloat, and utilizes `iconify-icon` for lightweight, scalable SVG iconography.
+- DATA MAPPING FIXES: The dashboard and order details views were refactored to strictly match the backend DTO contracts (e.g., binding to `orderId`, `senderAccount`, `recipientAccount`, and nested `payment` execution details like `paymentId` and `gatewayTransactionId`).
+- STATS AGGREGATION: Ensured strict client-side logic to only count orders as "Successful" when they reach the `COMPLETED` state, preventing `PENDING` orders from skewing financial dashboards.
+
+14. JULY 16 UPDATES: DYNAMIC CONFIG & SCHEDULING REFACTOR
+-------------------------------------------------------------------------------
+- DYNAMIC CONFIGURATION ENGINE: Migrated from static `application.yml` properties to a database-driven `CONFIG_TABLE`. Created `ConfigService.java` with an in-memory `ConcurrentHashMap` cache that refreshes dynamically.
+- SpEL SCHEDULING: Refactored `@Scheduled` annotations across all microservices to use Spring Expression Language (SpEL) to pull delays dynamically (e.g., `@Scheduled(fixedDelayString = "#{@configService.getConfigAsString('...')}")`).
+- DYNAMIC TRIGGER TASKS: Migrated complex business tasks (Outbox Polling, Idempotency Cleanup) to use `taskRegistrar.addTriggerTask()`. Fixed Spring Boot 3 compatibility issues by converting legacy `Date` returns to `Instant.now().plusMillis()`.
+- LOAD TESTING INFRASTRUCTURE: Built `load-test.ps1`, a robust PowerShell script capable of sanitizing JWT tokens and blasting the API gateway with both concurrent and sequential requests.
+- ORACLE DB COMPATIBILITY FIXES: Resolved `ORA-18716` timezone errors by explicitly mapping Java `LocalDateTime` fields using `columnDefinition = "TIMESTAMP"`.
+- RESILIENCE4J TUNING: Dramatically increased API Rate Limiter ceilings in `order-service` (`limitForPeriod: 300000`) to prevent `429 Too Many Requests` bottlenecks during heavy load testing.
+
+14. RECENT ARCHITECTURAL OPTIMIZATIONS (LAZY SYNC & PAGINATION)
+-------------------------------------------------------------------------------
+- LAZY SYNCHRONIZATION: The `ajbank-service` `TransferService` was refactored to eliminate database contention during high-concurrency. It now relies on the local operational balance for fast processing. It only queries the secure internal bank if a transaction throws an "Insufficient balance" exception.
+- BACKGROUND SYNC SCHEDULER: Introduced `BackgroundSyncScheduler` to periodically synchronize stale accounts from the secure DB in the background. The interval is dynamically configurable via `CONFIG_TABLE` (`AJBANK_BACKGROUND_SYNC_DELAY`).
+- LOAD TESTING SUCCESS: Using the custom `load-test.ps1` PowerShell script, the system successfully processed 10,000 concurrent and sequential requests with 0 failures, proving the efficacy of the Lazy Sync mechanism.
+- LOGGING POLICY: `logback-spring.xml` across all services was updated to use a `TimeBasedRollingPolicy` (1 file per day at midnight, no size chunking) with a 2-day retention policy (`maxHistory=2`).
+- UI PAGINATION: The Angular UI dashboard was upgraded to fully utilize Spring Data JPA pagination (`?page=X&size=Y`), including dynamic page navigation, "Go To Page" functionality, and accurate total record counts.
 
 ===============================================================================
 END OF DOCUMENT

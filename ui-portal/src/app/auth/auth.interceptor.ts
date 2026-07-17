@@ -10,7 +10,8 @@ let refreshTokenSubject: BehaviorSubject<any> = new BehaviorSubject<any>(null);
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const authService = inject(AuthService);
   const token = authService.getToken();
-  const correlationId = crypto.randomUUID();
+  // Use session correlation ID if logged in, otherwise generate one for the request
+  const correlationId = authService.getCorrelationId() || crypto.randomUUID();
 
   let setHeaders: any = {
     'X-Correlation-ID': correlationId
@@ -29,6 +30,11 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
       if (error.status === 401 && !req.url.includes('/refreshtoken')) {
         return handle401Error(clonedReq, next, authService);
       }
+      
+      if (error.status === 401 || error.status === 403) {
+        authService.logout();
+      }
+      
       return throwError(() => error);
     })
   );
