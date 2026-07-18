@@ -1,13 +1,8 @@
 package com.payment.order.service;
 
-import com.payment.order.dto.*;
-import com.payment.order.entity.PasswordResetToken;
-import com.payment.order.entity.RefreshToken;
-import com.payment.order.entity.User;
-import com.payment.order.repository.PasswordResetTokenRepository;
-import com.payment.order.repository.UserRepository;
-import com.payment.order.security.JwtUtils;
-import org.springframework.beans.factory.annotation.Autowired;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -16,8 +11,15 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.util.UUID;
+import com.payment.order.dto.JwtResponse;
+import com.payment.order.dto.LoginRequest;
+import com.payment.order.dto.RegisterRequest;
+import com.payment.order.entity.PasswordResetToken;
+import com.payment.order.entity.RefreshToken;
+import com.payment.order.entity.User;
+import com.payment.order.repository.PasswordResetTokenRepository;
+import com.payment.order.repository.UserRepository;
+import com.payment.order.security.JwtUtils;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -25,23 +27,26 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class UserService {
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
 
-    @Autowired
-    private PasswordEncoder encoder;
+    private final PasswordEncoder encoder;
 
-    @Autowired
-    private AuthenticationManager authenticationManager;
+    private final AuthenticationManager authenticationManager;
 
-    @Autowired
-    private JwtUtils jwtUtils;
+    private final JwtUtils jwtUtils;
 
-    @Autowired
-    private RefreshTokenService refreshTokenService;
+    private final RefreshTokenService refreshTokenService;
 
-    @Autowired
-    private PasswordResetTokenRepository passwordResetTokenRepository;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
+
+    UserService(UserRepository userRepository, PasswordEncoder encoder, AuthenticationManager authenticationManager, JwtUtils jwtUtils, RefreshTokenService refreshTokenService, PasswordResetTokenRepository passwordResetTokenRepository) {
+        this.userRepository = userRepository;
+        this.encoder = encoder;
+        this.authenticationManager = authenticationManager;
+        this.jwtUtils = jwtUtils;
+        this.refreshTokenService = refreshTokenService;
+        this.passwordResetTokenRepository = passwordResetTokenRepository;
+    }
 
     public void registerUser(RegisterRequest request) {
         if (userRepository.findByUsername(request.getUsername()).isPresent()) {

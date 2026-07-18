@@ -1,80 +1,100 @@
 package com.payment.order.controller;
 
-import com.payment.order.dto.*;
+import java.util.Optional;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.payment.order.dto.JwtResponse;
+import com.payment.order.dto.LoginRequest;
+import com.payment.order.dto.LogoutRequest;
+import com.payment.order.dto.PasswordResetConfirm;
+import com.payment.order.dto.PasswordResetRequest;
+import com.payment.order.dto.RegisterRequest;
+import com.payment.order.dto.TokenRefreshRequest;
+import com.payment.order.dto.TokenRefreshResponse;
 import com.payment.order.entity.RefreshToken;
 import com.payment.order.entity.User;
 import com.payment.order.security.JwtUtils;
 import com.payment.order.service.RefreshTokenService;
 import com.payment.order.service.UserService;
+
 import jakarta.validation.Valid;
-
-import java.util.Optional;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    @Autowired
-    private UserService userService;
+	private final UserService userService;
 
-    @Autowired
-    private RefreshTokenService refreshTokenService;
+	private final RefreshTokenService refreshTokenService;
 
-    @Autowired
-    private JwtUtils jwtUtils;
+	private final JwtUtils jwtUtils;
 
-    @PostMapping("/registeruser")
-    public ResponseEntity<?> registerUser(@Valid @RequestBody RegisterRequest registerRequest) {
-        userService.registerUser(registerRequest);
-        return ResponseEntity.ok("User registered successfully!");
-    }
+	AuthController(UserService userService, RefreshTokenService refreshTokenService, JwtUtils jwtUtils) {
+		this.userService = userService;
+		this.refreshTokenService = refreshTokenService;
+		this.jwtUtils = jwtUtils;
+	}
 
-    @PostMapping("/loginuser")
-    public ResponseEntity<JwtResponse> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
-        return ResponseEntity.ok(userService.authenticateUser(loginRequest));
-    }
+	@PostMapping("/registeruser")
+	public ResponseEntity<?> registerUser(@Valid @RequestBody RegisterRequest registerRequest) {
+		userService.registerUser(registerRequest);
+		return ResponseEntity.ok("User registered successfully!");
+	}
 
-    @PostMapping("/refreshtoken")
-    @Transactional
-    public ResponseEntity<?> refreshToken(@Valid @RequestBody TokenRefreshRequest request) {
-        String requestRefreshToken = request.getRefreshToken();
+	@PostMapping("/loginuser")
+	public ResponseEntity<JwtResponse> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
+		return ResponseEntity.ok(userService.authenticateUser(loginRequest));
+	}
 
-        Optional<RefreshToken> tokenOpt = refreshTokenService.findByToken(requestRefreshToken);
+	@PostMapping("/refreshtoken")
+	@Transactional
+	public ResponseEntity<?> refreshToken(@Valid @RequestBody TokenRefreshRequest request) {
+		String requestRefreshToken = request.getRefreshToken();
 
-        if (tokenOpt.isEmpty()) {
-            throw new RuntimeException("Refresh token is not in database!");
-        }
+		Optional<RefreshToken> tokenOpt = refreshTokenService.findByToken(requestRefreshToken);
 
-        RefreshToken refreshToken = tokenOpt.get();
-        refreshTokenService.verifyExpiration(refreshToken);
+		if (tokenOpt.isEmpty()) {
+			throw new RuntimeException("Refresh token is not in database!");
+		}
 
-        User user = refreshToken.getUser();
+		RefreshToken refreshToken = tokenOpt.get();
+		refreshTokenService.verifyExpiration(refreshToken);
 
-        // 1. Generate NEW Access Token
-        String token = jwtUtils.generateTokenFromUsername(user.getUsername());
+		User user = refreshToken.getUser();
 
-        // 2. Generate NEW Refresh Token (Rotation)
-        // The createRefreshToken method internally deletes the old one
-        RefreshToken newRefreshToken = refreshTokenService.createRefreshToken(user.getUsername());
+		// 1. Generate NEW Access Token
+		String token = jwtUtils.generateTokenFromUsername(user.getUsername());
 
-        return ResponseEntity.ok(new TokenRefreshResponse(token, newRefreshToken.getToken()));
-    }
+		// 2. Generate NEW Refresh Token (Rotation)
+		// The createRefreshToken method internally deletes the old one
+		RefreshToken newRefreshToken = refreshTokenService.createRefreshToken(user.getUsername());
 
-    @PostMapping("/password-reset-request")
-    public ResponseEntity<?> requestPasswordReset(@Valid @RequestBody PasswordResetRequest request) {
-        String token = userService.createPasswordResetToken(request.getEmail());
-        // In production, this token would be sent via email
-        return ResponseEntity.ok("Password reset token generated: " + token);
-    }
+		return ResponseEntity.ok(new TokenRefreshResponse(token, newRefreshToken.getToken()));
+	}
 
-    @PostMapping("/password-reset-confirm")
-    public ResponseEntity<?> confirmPasswordReset(@Valid @RequestBody PasswordResetConfirm request) {
-        userService.resetPassword(request.getToken(), request.getNewPassword());
-        return ResponseEntity.ok("Password has been reset successfully!");
-    }
+	@PostMapping("/password-reset-request")
+	public ResponseEntity<?> requestPasswordReset(@Valid @RequestBody PasswordResetRequest request) {
+		String token = userService.createPasswordResetToken(request.getEmail());
+		// In production, this token would be sent via email
+		return ResponseEntity.ok("Password reset token generated: " + token);
+	}
+
+	@PostMapping("/password-reset-confirm")
+	public ResponseEntity<?> confirmPasswordReset(@Valid @RequestBody PasswordResetConfirm request) {
+		userService.resetPassword(request.getToken(), request.getNewPassword());
+		return ResponseEntity.ok("Password has been reset successfully!");
+	}
+
+	@PostMapping("/logoutuser")
+	@Transactional
+	public ResponseEntity<?> logoutUser(@Valid @RequestBody LogoutRequest request) {
+		refreshTokenService.deleteByToken(request.getRefreshToken());
+		return ResponseEntity.ok("Log out successful!");
+	}
 }

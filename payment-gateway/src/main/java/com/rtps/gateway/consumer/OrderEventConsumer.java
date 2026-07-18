@@ -3,7 +3,6 @@ package com.rtps.gateway.consumer;
 import java.util.UUID;
 
 import org.slf4j.MDC;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
@@ -16,8 +15,11 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class OrderEventConsumer {
 
-    @Autowired
-    private PaymentService paymentService;
+    private final PaymentService paymentService;
+
+    OrderEventConsumer(PaymentService paymentService) {
+        this.paymentService = paymentService;
+    }
 
     @KafkaListener(topics = "order-events", groupId = "payment-gateway-group")
     public void consume(OrderCreatedEvent event) {

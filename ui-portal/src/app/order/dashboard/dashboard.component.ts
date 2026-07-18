@@ -1,4 +1,4 @@
-import { Component, OnInit, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
+import { Component, OnInit, OnDestroy, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -13,7 +13,7 @@ import { AuthService } from '../../auth/auth.service';
   styleUrls: ['./dashboard.component.css'],
   schemas: [CUSTOM_ELEMENTS_SCHEMA]
 })
-export class DashboardComponent implements OnInit {
+export class DashboardComponent implements OnInit, OnDestroy {
   orders: any[] = [];
   loading = true;
   username: string | null = '';
@@ -24,24 +24,72 @@ export class DashboardComponent implements OnInit {
   totalPages = 0;
   totalElements = 0;
   pageInput = 1;
+  
+  // Filtering state
+  isFilterSidebarOpen: boolean = false;
+  startDate: string = '';
+  endDate: string = '';
+  statusFilter: string = 'All';
+  accountFilter: string = '';
+  totalSuccess: number = 0;
+  totalFailure: number = 0;
 
   constructor(private orderService: OrderService, private authService: AuthService) {}
 
   ngOnInit(): void {
     this.username = this.authService.getUsername();
-    this.loadOrders();
+    
+    const savedState = this.orderService.getDashboardState();
+    if (savedState) {
+      this.orders = savedState.orders;
+      this.currentPage = savedState.currentPage;
+      this.pageSize = savedState.pageSize;
+      this.totalPages = savedState.totalPages;
+      this.totalElements = savedState.totalElements;
+      this.pageInput = savedState.pageInput;
+      this.startDate = savedState.startDate;
+      this.endDate = savedState.endDate;
+      this.statusFilter = savedState.statusFilter;
+      this.accountFilter = savedState.accountFilter;
+      this.totalSuccess = savedState.totalSuccess;
+      this.totalFailure = savedState.totalFailure;
+      this.loading = false;
+    } else {
+      this.loadOrders();
+    }
+  }
+
+  ngOnDestroy(): void {
+    this.orderService.saveDashboardState({
+      orders: this.orders,
+      currentPage: this.currentPage,
+      pageSize: this.pageSize,
+      totalPages: this.totalPages,
+      totalElements: this.totalElements,
+      pageInput: this.pageInput,
+      startDate: this.startDate,
+      endDate: this.endDate,
+      statusFilter: this.statusFilter,
+      accountFilter: this.accountFilter,
+      totalSuccess: this.totalSuccess,
+      totalFailure: this.totalFailure
+    });
   }
 
   loadOrders(): void {
     this.loading = true;
-    this.orderService.getOrders(this.currentPage, this.pageSize).subscribe({
+    
+    let startIso = this.startDate ? new Date(this.startDate).toISOString() : undefined;
+    let endIso = this.endDate ? new Date(this.endDate).toISOString() : undefined;
+
+    this.orderService.getOrders(this.currentPage, this.pageSize, startIso, endIso, this.statusFilter, this.accountFilter).subscribe({
       next: (res) => {
-        // Support both paginated and non-paginated responses gracefully
         if (res.content) {
             this.orders = res.content;
-            this.totalPages = res.totalPages;
-            this.totalElements = res.totalElements;
-            this.currentPage = res.number;
+            this.totalElements = res.total;
+            this.totalPages = Math.ceil(res.total / this.pageSize);
+            this.totalSuccess = res.success;
+            this.totalFailure = res.failure;
             this.pageInput = this.currentPage + 1;
         } else {
             this.orders = res;
@@ -57,6 +105,25 @@ export class DashboardComponent implements OnInit {
         this.loading = false;
       }
     });
+  }
+
+  applyFilter(): void {
+    this.currentPage = 0;
+    this.isFilterSidebarOpen = false;
+    this.loadOrders();
+  }
+
+  clearFilter(): void {
+    this.startDate = '';
+    this.endDate = '';
+    this.statusFilter = 'All';
+    this.accountFilter = '';
+    this.currentPage = 0;
+    this.loadOrders();
+  }
+  
+  toggleFilterSidebar(): void {
+    this.isFilterSidebarOpen = !this.isFilterSidebarOpen;
   }
   
   nextPage(): void {
@@ -85,12 +152,9 @@ export class DashboardComponent implements OnInit {
   }
   
   logout(): void {
+    this.orderService.clearDashboardState();
     this.authService.logout();
   }
 
-  get successfulOrdersCount(): number {
-    return this.orders.filter(o => 
-      o.status === 'COMPLETED' || o.status === 'SUCCESS' || o.status === 'PROCESSED'
-    ).length;
-  }
+
 }

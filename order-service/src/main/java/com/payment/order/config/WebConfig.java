@@ -1,6 +1,5 @@
 package com.payment.order.config;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -8,11 +7,14 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
-    @Autowired
-    private CorrelationIdInterceptor correlationIdInterceptor;
+	private final CorrelationIdInterceptor correlationIdInterceptor;
 
-    @Override
-    public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(correlationIdInterceptor);
-    }
+	WebConfig(CorrelationIdInterceptor correlationIdInterceptor) {
+		this.correlationIdInterceptor = correlationIdInterceptor;
+	}
+
+	@Override
+	public void addInterceptors(InterceptorRegistry registry) {
+		registry.addInterceptor(correlationIdInterceptor);
+	}
 }

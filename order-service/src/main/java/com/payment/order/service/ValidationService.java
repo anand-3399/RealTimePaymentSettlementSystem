@@ -1,20 +1,23 @@
 package com.payment.order.service;
 
+import java.math.BigDecimal;
+
+import org.springframework.stereotype.Service;
+
 import com.payment.order.dto.CreateOrderRequest;
 import com.payment.order.entity.User;
 import com.payment.order.exception.InvalidOrderException;
 import com.payment.order.exception.UserNotFoundException;
 import com.payment.order.repository.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import java.math.BigDecimal;
 
 @Service
 public class ValidationService {
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
+
+    ValidationService(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
 
     public User validateOrderRequest(CreateOrderRequest request, String userId, String idempotencyKey) {
         validateIdempotencyKey(idempotencyKey);

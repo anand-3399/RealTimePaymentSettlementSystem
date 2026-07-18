@@ -8,6 +8,11 @@ spring:
     username: ${ORACLE_USER}
     password: ${ORACLE_PASSWORD}
     driver-class-name: oracle.jdbc.OracleDriver
+    secure:
+      url: ${ORACLE_SECURE_URL}
+      username: ${ORACLE_SECURE_USER}
+      password: ${ORACLE_SECURE_PASSWORD}
+      driver-class-name: oracle.jdbc.OracleDriver
     hikari:
       minimum-idle: 5
       maximum-pool-size: 100
@@ -36,3 +41,4 @@ rtps:
     webhook:
       url: ${RTPS_BANK1_WEBHOOK_URL}
       secret: ${RTPS_BANK1_WEBHOOK_SECRET}
+      retry-delay: ${RTPS_BANK1_WEBHOOK_RETRY_DELAY}

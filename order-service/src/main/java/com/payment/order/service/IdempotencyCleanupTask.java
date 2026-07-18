@@ -2,7 +2,6 @@ package com.payment.order.service;
 
 import java.time.LocalDateTime;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,8 +14,11 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class IdempotencyCleanupTask {
 
-    @Autowired
-    private IdempotencyKeyRepository repository;
+    private final IdempotencyKeyRepository repository;
+
+    IdempotencyCleanupTask(IdempotencyKeyRepository repository) {
+        this.repository = repository;
+    }
 
     @Scheduled(fixedDelayString = "#{@configService.getConfigAsString('ORDER_IDEMPOTENCY_CLEANUP_DELAY')}")
     @Transactional

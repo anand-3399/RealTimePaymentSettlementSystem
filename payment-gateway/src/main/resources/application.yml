@@ -5,7 +5,7 @@ spring:
     active: local
   jackson:
     serialization:
-      write-dates-as-timestamps: false
+      indent_output: true
 
   datasource:
     url: ${ORACLE_URL}
@@ -32,7 +32,7 @@ spring:
   kafka:
     bootstrap-servers: ${KAFKA_SERVERS}
     consumer:
-      group-id: payment-gateway-group
+      group-id: payment-processor-group
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer

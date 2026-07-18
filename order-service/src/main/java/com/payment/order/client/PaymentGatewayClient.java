@@ -3,7 +3,6 @@ package com.payment.order.client;
 import java.util.Optional;
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -22,43 +21,41 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class PaymentGatewayClient {
 
-    @Autowired
-    private RestTemplate restTemplate;
+	private final RestTemplate restTemplate;
 
-    @Value("${rtps.payment-gateway.url}")
-    private String processorUrl;
+	@Value("${rtps.payment-gateway.url}")
+	private String processorUrl;
 
-    @Value("${rtps.payment-gateway.path}")
-    private String processorPath;
+	@Value("${rtps.payment-gateway.path}")
+	private String processorPath;
 
-    @Value("${rtps.payment-gateway.secret}")
-    private String internalSecret;
+	@Value("${rtps.payment-gateway.secret}")
+	private String internalSecret;
 
-    public Optional<PaymentStatusResponse> getPaymentStatusByOrderId(UUID orderId) {
-        try {
-            String url = processorUrl + processorPath + "?orderId=" + orderId;
-            log.info("Querying internal payment status for orderId: {} | URL: {}", orderId, url);
+	PaymentGatewayClient(RestTemplate restTemplate) {
+		this.restTemplate = restTemplate;
+	}
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("X-Internal-Secret", internalSecret);
-            HttpEntity<String> entity = new HttpEntity<>(headers);
+	public Optional<PaymentStatusResponse> getPaymentStatusByOrderId(UUID orderId) {
+		try {
+			String url = processorUrl + processorPath + "?orderId=" + orderId;
+			log.info("Querying internal payment status for orderId: {} | URL: {}", orderId, url);
 
-            ResponseEntity<PaymentStatusResponse> response = restTemplate.exchange(
-                    url,
-                    HttpMethod.GET,
-                    entity,
-                    PaymentStatusResponse.class
-            );
+			HttpHeaders headers = new HttpHeaders();
+			headers.set("X-Internal-Secret", internalSecret);
+			HttpEntity<String> entity = new HttpEntity<>(headers);
 
-            if (response.getStatusCode() == HttpStatus.OK) {
-                return Optional.ofNullable(response.getBody());
-            }
-        } catch (HttpClientErrorException.NotFound e) {
-            log.warn("Payment not found yet for orderId: {}", orderId);
-        } catch (Exception e) {
-            log.error("Failed to query internal payment processor for orderId: {} | Error: {}", orderId, e);
-        }
-        return Optional.empty();
-    }
+			ResponseEntity<PaymentStatusResponse> response = restTemplate.exchange(url, HttpMethod.GET, entity,
+					PaymentStatusResponse.class);
+
+			if (response.getStatusCode() == HttpStatus.OK) {
+				return Optional.ofNullable(response.getBody());
+			}
+		} catch (HttpClientErrorException.NotFound e) {
+			log.warn("Payment not found yet for orderId: {}", orderId);
+		} catch (Exception e) {
+			log.error("Failed to query internal payment processor for orderId: {} | Error: {}", orderId, e);
+		}
+		return Optional.empty();
+	}
 }
-

@@ -4,11 +4,13 @@ import java.time.Duration;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.web.client.RestTemplateBuilder;
+
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
@@ -31,14 +33,13 @@ public class Bank1Client {
     private final String internalSecret;
 
     public Bank1Client(
-            RestTemplateBuilder builder,
             @Value("${rtps.bank1.url}") String ajBankUrl,
             @Value("${rtps.bank1.secret}") String internalSecret) {
         
-        this.restTemplate = builder
-                .setConnectTimeout(Duration.ofSeconds(2))
-                .setReadTimeout(Duration.ofSeconds(10))
-                .build();
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout((int) Duration.ofSeconds(2).toMillis());
+        factory.setReadTimeout((int) Duration.ofSeconds(10).toMillis());
+        this.restTemplate = new RestTemplate(factory);
         this.ajBankUrl = ajBankUrl;
         this.internalSecret = internalSecret;
     }
@@ -50,7 +51,7 @@ public class Bank1Client {
         
         try {
             ResponseEntity<AccountBalance> response = restTemplate.exchange(
-                url, org.springframework.http.HttpMethod.GET, new HttpEntity<>(headers), AccountBalance.class
+                url, HttpMethod.GET, new HttpEntity<>(headers), AccountBalance.class
             );
             return Optional.ofNullable(response.getBody());
         } catch (Exception e) {

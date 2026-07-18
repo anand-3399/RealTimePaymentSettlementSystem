@@ -17,11 +17,12 @@
     <!-- Debug/Info/Warn Appender -->
     <appender name="DEBUG_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${LOG_DIR}/debug.log</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
             <!-- Rollover daily -->
-            <fileNamePattern>${LOG_DIR}/debug-%d{yyyy-MM-dd}.zip</fileNamePattern>
+            <fileNamePattern>${LOG_DIR}/debug-%d{yyyy-MM-dd}.%i.zip</fileNamePattern>
             <!-- Keep logs for 2 days -->
-            <maxHistory>2</maxHistory>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>1</maxHistory>
         </rollingPolicy>
         <encoder>
             <pattern>${LOG_PATTERN}</pattern>
@@ -35,9 +36,10 @@
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
             <level>ERROR</level>
         </filter>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>${LOG_DIR}/error-%d{yyyy-MM-dd}.zip</fileNamePattern>
-            <maxHistory>2</maxHistory>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_DIR}/error-%d{yyyy-MM-dd}.%i.zip</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>1</maxHistory>
         </rollingPolicy>
         <encoder>
             <pattern>${LOG_PATTERN}</pattern>

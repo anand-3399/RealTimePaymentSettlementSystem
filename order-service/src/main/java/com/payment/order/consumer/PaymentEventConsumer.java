@@ -1,7 +1,6 @@
 package com.payment.order.consumer;
 
 import org.slf4j.MDC;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,45 +15,47 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class PaymentEventConsumer {
 
-    @Autowired
-    private OrderRepository orderRepository;
+	private final OrderRepository orderRepository;
 
-    @KafkaListener(topics = "payment-events", groupId = "order-service-group")
-    @Transactional
-    public void consume(PaymentProcessedEvent event) {
-        MDC.put("correlationId", event.getCorrelationId());
-        try {
-            log.info("Received PaymentProcessedEvent | orderId: {} | status: {}", 
-                    event.getOrderId(), event.getStatus());
+	PaymentEventConsumer(OrderRepository orderRepository) {
+		this.orderRepository = orderRepository;
+	}
 
-            orderRepository.findById(event.getOrderId()).ifPresentOrElse(order -> {
-                if (order.getStatus() == Order.OrderStatus.PENDING) {
-                    if ("COMPLETED".equalsIgnoreCase(event.getStatus())) {
-                        order.setStatus(Order.OrderStatus.COMPLETED);
-                    } else if ("FAILED".equalsIgnoreCase(event.getStatus())) {
-                        order.setStatus(Order.OrderStatus.FAILED);
-                    }
-                    
-                    order.setPaymentGatewayId(event.getPaymentGatewayId());
-                    order.setBankReferenceId(event.getBankReferenceId());
-                    order.setProcessedAt(event.getTimestamp());
-                    order.setReason(event.getMessage());
-                    
-                    orderRepository.save(order);
-                    log.info("Successfully updated order {} status to {}", order.getOrderId(), order.getStatus());
-                } else {
-                    log.debug("Order {} already in status {}. Skipping update.", order.getOrderId(), order.getStatus());
-                }
-            }, () -> {
-                log.error("Order not found for PaymentProcessedEvent | orderId: {}", event.getOrderId());
-            });
+	@KafkaListener(topics = "payment-events", groupId = "order-service-group")
+	@Transactional
+	public void consume(PaymentProcessedEvent event) {
+		MDC.put("correlationId", event.getCorrelationId());
+		try {
+			log.info("Received PaymentProcessedEvent | orderId: {} | status: {}", event.getOrderId(),
+					event.getStatus());
 
-        } catch (Exception e) {
-            log.error("Error processing PaymentProcessedEvent | orderId: {} | error: {}", 
-                    event.getOrderId(), e.getMessage());
-        } finally {
-            MDC.remove("correlationId");
-        }
-    }
+			orderRepository.findById(event.getOrderId()).ifPresentOrElse(order -> {
+				if (order.getStatus() == Order.OrderStatus.PENDING) {
+					if ("COMPLETED".equalsIgnoreCase(event.getStatus())) {
+						order.setStatus(Order.OrderStatus.COMPLETED);
+					} else if ("FAILED".equalsIgnoreCase(event.getStatus())) {
+						order.setStatus(Order.OrderStatus.FAILED);
+					}
+
+					order.setPaymentGatewayId(event.getPaymentGatewayId());
+					order.setBankReferenceId(event.getBankReferenceId());
+					order.setProcessedAt(event.getTimestamp());
+					order.setReason(event.getMessage());
+
+					orderRepository.save(order);
+					log.info("Successfully updated order {} status to {}", order.getOrderId(), order.getStatus());
+				} else {
+					log.debug("Order {} already in status {}. Skipping update.", order.getOrderId(), order.getStatus());
+				}
+			}, () -> {
+				log.error("Order not found for PaymentProcessedEvent | orderId: {}", event.getOrderId());
+			});
+
+		} catch (Exception e) {
+			log.error("Error processing PaymentProcessedEvent | orderId: {} | error: {}", event.getOrderId(),
+					e.getMessage());
+		} finally {
+			MDC.remove("correlationId");
+		}
+	}
 }
-

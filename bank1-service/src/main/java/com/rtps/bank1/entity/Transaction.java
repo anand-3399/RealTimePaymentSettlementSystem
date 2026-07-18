@@ -17,7 +17,8 @@ public class Transaction {
     @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;
 
-    private UUID paymentProcessorId;
+    @Column(name = "payment_processor_id")
+    private UUID paymentGatewayId;
     private String idempotencyKey;
 
     @Column(nullable = false)

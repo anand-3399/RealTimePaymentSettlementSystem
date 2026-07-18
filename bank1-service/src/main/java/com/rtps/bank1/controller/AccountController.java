@@ -1,17 +1,22 @@
 package com.rtps.bank1.controller;
 
-import com.rtps.bank1.entity.OperationalBankAccount;
-import com.rtps.bank1.repository.OperationalBankAccountRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.rtps.bank1.repository.OperationalBankAccountRepository;
 
 @RestController
 @RequestMapping("/api/accounts")
 public class AccountController {
 
-    @Autowired
-    private OperationalBankAccountRepository accountRepository;
+    private final OperationalBankAccountRepository accountRepository;
+
+    AccountController(OperationalBankAccountRepository accountRepository) {
+        this.accountRepository = accountRepository;
+    }
 
     @GetMapping("/{accountNumber}/balance")
     public ResponseEntity<?> getBalance(@PathVariable String accountNumber) {

@@ -1,19 +1,22 @@
 package com.payment.order.service;
 
-import com.payment.order.entity.IdempotencyKey;
-import com.payment.order.repository.IdempotencyKeyRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.stereotype.Service;
+
+import com.payment.order.entity.IdempotencyKey;
+import com.payment.order.repository.IdempotencyKeyRepository;
+
 @Service
 public class IdempotencyService {
 
-    @Autowired
-    private IdempotencyKeyRepository repository;
+    private final IdempotencyKeyRepository repository;
+
+    IdempotencyService(IdempotencyKeyRepository repository) {
+        this.repository = repository;
+    }
 
     public Optional<UUID> getOrderId(String key) {
         return repository.findById(key).map(IdempotencyKey::getOrderId);

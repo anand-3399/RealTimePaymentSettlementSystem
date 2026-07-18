@@ -1,6 +1,5 @@
 package com.payment.order.event;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
@@ -12,8 +11,11 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class EagerOutboxListener {
 
-    @Autowired
-    private OutboxPublisher outboxPublisher;
+    private final OutboxPublisher outboxPublisher;
+
+    EagerOutboxListener(OutboxPublisher outboxPublisher) {
+        this.outboxPublisher = outboxPublisher;
+    }
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)

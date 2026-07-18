@@ -35,15 +35,27 @@
         <div class="stat-icon" style="color: var(--success); background: rgba(16,185,129,0.1)"><iconify-icon icon="lucide:check-circle"></iconify-icon></div>
         <div class="stat-info">
           <h3>Success</h3>
-          <p>{{ successfulOrdersCount }}</p>
+          <p>{{ totalSuccess }}</p>
+        </div>
+      </div>
+      <div class="stat-card glass-card">
+        <div class="stat-icon" style="color: #ef4444; background: rgba(239,68,68,0.1)"><iconify-icon icon="lucide:x-circle"></iconify-icon></div>
+        <div class="stat-info">
+          <h3>Failure</h3>
+          <p>{{ totalFailure }}</p>
         </div>
       </div>
     </div>
 
     <div class="orders-section glass-card">
-      <div class="section-header">
+      <div class="section-header" style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
         <h2>Recent Orders</h2>
-        <button class="icon-btn" (click)="loadOrders()"><iconify-icon icon="lucide:refresh-cw"></iconify-icon></button>
+        <div class="date-filters" style="display: flex; gap: 10px; align-items: center; margin-left: auto;">
+          <button class="btn-secondary" (click)="toggleFilterSidebar()" style="padding: 6px 12px; font-size: 0.9rem; border: 1px solid rgba(255,255,255,0.2);">
+            <iconify-icon icon="lucide:filter"></iconify-icon> Filter
+          </button>
+          <button class="icon-btn" (click)="loadOrders()" title="Refresh"><iconify-icon icon="lucide:refresh-cw"></iconify-icon></button>
+        </div>
       </div>
 
       <div class="loading-state" *ngIf="loading">
@@ -108,4 +120,45 @@
       </div>
     </div>
   </main>
+</div>
+
+<!-- Filter Sidebar Overlay -->
+<div class="filter-backdrop" *ngIf="isFilterSidebarOpen" (click)="toggleFilterSidebar()"></div>
+<div class="filter-sidebar glass-card" [class.open]="isFilterSidebarOpen">
+  <div class="filter-header">
+    <h3>Filters</h3>
+    <button class="icon-btn close-btn" (click)="toggleFilterSidebar()"><iconify-icon icon="lucide:x"></iconify-icon></button>
+  </div>
+  
+  <div class="filter-body">
+    <div class="form-group">
+      <label>Status</label>
+      <select [(ngModel)]="statusFilter" class="form-input">
+        <option value="All">All Statuses</option>
+        <option value="COMPLETED">Completed</option>
+        <option value="PENDING">Pending</option>
+        <option value="FAILED">Failed</option>
+      </select>
+    </div>
+    
+    <div class="form-group">
+      <label>Recipient Account No.</label>
+      <input type="text" [(ngModel)]="accountFilter" class="form-input" placeholder="e.g. 9876543210">
+    </div>
+    
+    <div class="form-group">
+      <label>Start Date</label>
+      <input type="datetime-local" [(ngModel)]="startDate" class="form-input">
+    </div>
+    
+    <div class="form-group">
+      <label>End Date</label>
+      <input type="datetime-local" [(ngModel)]="endDate" class="form-input">
+    </div>
+  </div>
+  
+  <div class="filter-footer">
+    <button class="btn-secondary" (click)="clearFilter()" style="flex: 1;">Clear</button>
+    <button class="btn-primary" (click)="applyFilter()" style="flex: 1;">Apply</button>
+  </div>
 </div>

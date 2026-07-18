@@ -24,46 +24,42 @@ import java.util.Collections;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    @Value("${rtps.inbound-secret}")
-    private String inboundSecret;
+	@Value("${rtps.inbound-secret}")
+	private String inboundSecret;
 
-    @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-            .csrf(AbstractHttpConfigurer::disable)
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/payment-gateway/internal/**").authenticated()
-                .requestMatchers("/api/v1/payments/**").permitAll() // Public tracking or similar
-                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                .requestMatchers("/actuator/**").permitAll()
-                .anyRequest().authenticated()
-            )
-            .addFilterBefore(new InternalSecretFilter(inboundSecret), UsernamePasswordAuthenticationFilter.class);
-        
-        return http.build();
-    }
+	@Bean
+	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+		http.csrf(AbstractHttpConfigurer::disable)
+				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+				.authorizeHttpRequests(auth -> auth.requestMatchers("/api/payment-gateway/internal/**").authenticated()
+						.requestMatchers("/api/v1/payments/**").permitAll() // Public tracking or similar
+						.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+						.requestMatchers("/actuator/**").permitAll().anyRequest().authenticated())
+				.addFilterBefore(new InternalSecretFilter(inboundSecret), UsernamePasswordAuthenticationFilter.class);
 
-    private static class InternalSecretFilter extends OncePerRequestFilter {
-        private final String secret;
+		return http.build();
+	}
 
-        public InternalSecretFilter(String secret) {
-            this.secret = secret;
-        }
+	private static class InternalSecretFilter extends OncePerRequestFilter {
+		private final String secret;
 
-        @Override
-        protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-                throws ServletException, IOException {
-            
-            String requestSecret = request.getHeader("X-Internal-Secret");
+		public InternalSecretFilter(String secret) {
+			this.secret = secret;
+		}
 
-            if (secret.equals(requestSecret)) {
-                UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
-                        "INTERNAL_SERVICE", null, Collections.emptyList());
-                SecurityContextHolder.getContext().setAuthentication(auth);
-            }
+		@Override
+		protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
+				FilterChain filterChain) throws ServletException, IOException {
 
-            filterChain.doFilter(request, response);
-        }
-    }
+			String requestSecret = request.getHeader("X-Internal-Secret");
+
+			if (secret.equals(requestSecret)) {
+				UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken("INTERNAL_SERVICE",
+						null, Collections.emptyList());
+				SecurityContextHolder.getContext().setAuthentication(auth);
+			}
+
+			filterChain.doFilter(request, response);
+		}
+	}
 }

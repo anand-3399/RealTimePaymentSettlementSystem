@@ -47,6 +47,7 @@ public class Order {
     @Column(nullable = false, columnDefinition = "TIMESTAMP")
     private LocalDateTime createdAt;
 
+    @Column(name = "PAYMENT_GATEWAY_ID")
     private UUID paymentGatewayId;
     private String bankReferenceId;
     @Column(columnDefinition = "TIMESTAMP")

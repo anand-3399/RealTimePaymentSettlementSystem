@@ -2,7 +2,6 @@ package com.rtps.gateway.controller;
 
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,11 +21,14 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class InternalPaymentController {
 
-    @Autowired
-    private PaymentService paymentService;
+    private final PaymentService paymentService;
 
     @Value("${rtps.inbound-secret}")
     private String internalSecret;
+
+    InternalPaymentController(PaymentService paymentService) {
+        this.paymentService = paymentService;
+    }
 
     @GetMapping("/payments")
     public ResponseEntity<PaymentResponse> getInternalPayment(

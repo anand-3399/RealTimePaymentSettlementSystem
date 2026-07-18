@@ -129,3 +129,5 @@ config_seed.sql
 ajbank-service/src/main/java/com/rtps/ajbank/config/FlywayRepairConfig.java
 ajbank-service/src/test/java/com/rtps/ajbank/DbCheckerTest.java
 load-test.ps1
+db-stop.ps1
+db-start.ps1

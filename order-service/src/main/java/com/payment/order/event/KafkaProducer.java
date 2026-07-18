@@ -3,7 +3,6 @@ package com.payment.order.event;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
@@ -14,8 +13,11 @@ import lombok.extern.slf4j.Slf4j;
 public class KafkaProducer {
     private static final String TOPIC = "order-events";
 
-    @Autowired
-    private KafkaTemplate<String, OrderCreatedEvent> kafkaTemplate;
+    private final KafkaTemplate<Object, Object> kafkaTemplate;
+
+    KafkaProducer(KafkaTemplate<Object, Object> kafkaTemplate) {
+        this.kafkaTemplate = kafkaTemplate;
+    }
 
     public void sendOrderCreatedEventSync(OrderCreatedEvent event) throws Exception {
         log.info("Publishing OrderCreatedEvent (Synchronous): {}", event.getOrderId());

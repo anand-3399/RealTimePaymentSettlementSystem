@@ -3,7 +3,6 @@ package com.rtps.gateway.scheduler;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -17,23 +16,24 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class PaymentRetryScheduler {
 
-	@Autowired
-	private PaymentRepository paymentRepository;
+	private final PaymentRepository paymentRepository;
 
-	@Autowired
-	private PaymentService paymentService;
- 
-	@Scheduled(fixedDelayString = "#{@configService.getConfigAsString('PAYMENT_RETRY_SCHEDULER_DELAY')}")
+	private final PaymentService paymentService;
+
+	PaymentRetryScheduler(PaymentRepository paymentRepository, PaymentService paymentService) {
+		this.paymentRepository = paymentRepository;
+		this.paymentService = paymentService;
+	}
+
+	@Scheduled(fixedDelayString = "#{@configService.getConfigAsString('PAYMENT_RETRY_SCHEDULER_DELAY_MS')}")
 	public void retryPendingPayments() {
 		log.debug("Checking for payments due for retry...");
 
-        List<Payment.PaymentStatus> retriableStatuses = List.of(
-            Payment.PaymentStatus.PENDING_RETRY, 
-            Payment.PaymentStatus.LOCKED_PENDING_RETRY
-        );
+		List<Payment.PaymentStatus> retriableStatuses = List.of(Payment.PaymentStatus.PENDING_RETRY,
+				Payment.PaymentStatus.LOCKED_PENDING_RETRY);
 
-        List<Payment> duePayments = paymentRepository.findPaymentsDueForRetry(retriableStatuses, LocalDateTime.now());
- 
+		List<Payment> duePayments = paymentRepository.findPaymentsDueForRetry(retriableStatuses, LocalDateTime.now());
+
 		if (duePayments.isEmpty()) {
 			return;
 		}
@@ -49,4 +49,3 @@ public class PaymentRetryScheduler {
 		}
 	}
 }
-

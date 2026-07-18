@@ -49,6 +49,8 @@ rtps:
   jwtSecret: ${JWT_SECRET}
   jwtExpirationMs: 1800000 # 30 minutes
   refreshExpirationMs: 604800000 # 7 days
+  cors:
+    allowed-origins: ${ALLOWED_ORIGINS}
   payment-gateway:
     url: ${PAYMENT_PROCESSOR_URL}
     path: ${PAYMENT_PROCESSOR_PATH}

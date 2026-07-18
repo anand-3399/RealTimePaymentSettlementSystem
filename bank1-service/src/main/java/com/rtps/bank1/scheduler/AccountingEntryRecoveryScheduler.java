@@ -4,7 +4,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import org.slf4j.MDC;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -21,51 +20,56 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class AccountingEntryRecoveryScheduler {
 
-    @Autowired
-    private AccountingEntryRepository accountingEntryRepository;
+	private final AccountingEntryRepository accountingEntryRepository;
 
-    @Autowired
-    private TransferService transferService;
+	private final TransferService transferService;
 
-    @Autowired
-    private WebhookEmitterService webhookEmitterService;
+	private final WebhookEmitterService webhookEmitterService;
 
-    @Scheduled(fixedDelayString = "#{@configService.getConfigAsString('BANK1_RECOVERY_SCHEDULER_DELAY')}")
-    public void recoverPendingEntries() {
-        // Find entries stuck in PENDING for more than 1 minute
-        LocalDateTime threshold = LocalDateTime.now().minusMinutes(1);
-        List<AccountingEntry> stuckEntries = accountingEntryRepository.findByEntryStatusAndCreatedAtBefore("PENDING", threshold);
+	AccountingEntryRecoveryScheduler(TransferService transferService, WebhookEmitterService webhookEmitterService,
+			AccountingEntryRepository accountingEntryRepository) {
+		this.transferService = transferService;
+		this.webhookEmitterService = webhookEmitterService;
+		this.accountingEntryRepository = accountingEntryRepository;
+	}
 
-        if (stuckEntries.isEmpty()) {
-            return;
-        }
+	@Scheduled(fixedDelayString = "#{@configService.getConfigAsString('AJBANK_RECOVERY_SCHEDULER_DELAY')}")
+	public void recoverPendingEntries() {
+		// Find entries stuck in PENDING for more than 1 minute
+		LocalDateTime threshold = LocalDateTime.now().minusMinutes(1);
+		List<AccountingEntry> stuckEntries = accountingEntryRepository.findByEntryStatusAndCreatedAtBefore("PENDING",
+				threshold);
 
-        log.info("Found {} stuck PENDING accounting entries to recover", stuckEntries.size());
+		if (stuckEntries.isEmpty()) {
+			return;
+		}
 
-        for (AccountingEntry entry : stuckEntries) {
-            String correlationId = "recovery-" + entry.getEntryId().toString();
-            try {
-                TransferRequest request = new TransferRequest();
-                request.setSenderAccount(entry.getSenderAccountId());
-                request.setRecipientAccount(entry.getRecipientAccountId());
-                request.setAmount(entry.getAmount());
-                request.setCurrency("INR"); 
-                request.setPaymentGatewayId(entry.getPaymentId());
-                
-                MDC.put("correlationId", correlationId);
+		log.info("Found {} stuck PENDING accounting entries to recover", stuckEntries.size());
 
-                log.info("Recovering stuck entry: {}", entry.getEntryId());
-                TransferResponse finalResponse = transferService.executeTransferInternal(request, correlationId, entry.getEntryId());
-                
-                // Fire webhook
-                webhookEmitterService.sendWebhook(finalResponse);
+		for (AccountingEntry entry : stuckEntries) {
+			String correlationId = "recovery-" + entry.getEntryId().toString();
+			try {
+				TransferRequest request = new TransferRequest();
+				request.setSenderAccount(entry.getSenderAccountId());
+				request.setRecipientAccount(entry.getRecipientAccountId());
+				request.setAmount(entry.getAmount());
+				request.setCurrency("INR");
+				request.setPaymentGatewayId(entry.getPaymentId());
 
-            } catch (Exception e) {
-                log.error("Failed to recover entry {}: {}", entry.getEntryId(), e);
-            } finally {
-                MDC.remove("correlationId");
-            }
-        }
-    }
+				MDC.put("correlationId", correlationId);
+
+				log.info("Recovering stuck entry: {}", entry.getEntryId());
+				TransferResponse finalResponse = transferService.executeTransferInternal(request, correlationId,
+						entry.getEntryId());
+
+				// Fire webhook
+				webhookEmitterService.sendWebhook(finalResponse);
+
+			} catch (Exception e) {
+				log.error("Failed to recover entry {}: {}", entry.getEntryId(), e);
+			} finally {
+				MDC.remove("correlationId");
+			}
+		}
+	}
 }
-

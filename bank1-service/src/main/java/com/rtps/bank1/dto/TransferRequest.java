@@ -17,6 +17,6 @@ public class TransferRequest {
     private BigDecimal amount;
     private String currency;
     private String idempotencyKey;
-    private UUID paymentProcessorId;
+    private UUID paymentGatewayId;
     private String correlationId;
 }

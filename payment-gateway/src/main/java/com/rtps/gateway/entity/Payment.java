@@ -47,8 +47,8 @@ public class Payment {
     @Column(length = 2000)
     private String gatewayResponse;
 
-    private Integer retryCount = 0;
-    private Integer maxRetries = 3;
+    private Integer retryCount;
+    private Integer maxRetries;
     
     private LocalDateTime lastRetryAt;
     private LocalDateTime nextRetryAt;
@@ -64,7 +64,7 @@ public class Payment {
     @Enumerated(EnumType.STRING)
     private RetryReason retryReason;
     
-    private Integer lockedContentionCount = 0;
+    private Integer lockedContentionCount;
 
     public enum PaymentStatus {
         PENDING, PROCESSING, COMPLETED, FAILED, PENDING_RETRY, LOCKED_PENDING_RETRY, SENT_AWAITING_RESPONSE

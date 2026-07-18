@@ -2,7 +2,7 @@
 REAL-TIME PAYMENT SETTLEMENT SYSTEM (RTPS) - THE PROJECT BIBLE
 ===============================================================================
 Version: 1.0 (Production Hardened)
-Author: Antigravity AI & Anand Jaiswar
+Author: Anand Jaiswar
 System State: Fully Asynchronous / Event-Driven / ACID Compliant
 -------------------------------------------------------------------------------
 
