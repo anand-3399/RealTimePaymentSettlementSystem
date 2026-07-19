@@ -4,13 +4,14 @@ import { RegisterComponent } from './auth/register/register.component';
 import { DashboardComponent } from './order/dashboard/dashboard.component';
 import { CreateComponent } from './order/create/create.component';
 import { DetailsComponent } from './order/details/details.component';
+import { authGuard, publicGuard } from './auth/auth.guard';
 
 export const routes: Routes = [
-  { path: '', redirectTo: '/login', pathMatch: 'full' },
-  { path: 'login', component: LoginComponent },
-  { path: 'register', component: RegisterComponent },
-  { path: 'dashboard', component: DashboardComponent },
-  { path: 'create-order', component: CreateComponent },
-  { path: 'order-details/:id', component: DetailsComponent },
-  { path: '**', redirectTo: '/login' }
+  { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
+  { path: 'login', component: LoginComponent, canActivate: [publicGuard] },
+  { path: 'register', component: RegisterComponent, canActivate: [publicGuard] },
+  { path: 'dashboard', component: DashboardComponent, canActivate: [authGuard] },
+  { path: 'create-order', component: CreateComponent, canActivate: [authGuard] },
+  { path: 'order-details/:id', component: DetailsComponent, canActivate: [authGuard] },
+  { path: '**', redirectTo: '/dashboard' }
 ];

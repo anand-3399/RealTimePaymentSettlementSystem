@@ -41,22 +41,17 @@ export class DashboardComponent implements OnInit, OnDestroy {
     
     const savedState = this.orderService.getDashboardState();
     if (savedState) {
-      this.orders = savedState.orders;
       this.currentPage = savedState.currentPage;
       this.pageSize = savedState.pageSize;
-      this.totalPages = savedState.totalPages;
-      this.totalElements = savedState.totalElements;
       this.pageInput = savedState.pageInput;
       this.startDate = savedState.startDate;
       this.endDate = savedState.endDate;
       this.statusFilter = savedState.statusFilter;
       this.accountFilter = savedState.accountFilter;
-      this.totalSuccess = savedState.totalSuccess;
-      this.totalFailure = savedState.totalFailure;
-      this.loading = false;
-    } else {
-      this.loadOrders();
     }
+    
+    // Always load fresh data to ensure real-time updates are reflected
+    this.loadOrders();
   }
 
   ngOnDestroy(): void {
